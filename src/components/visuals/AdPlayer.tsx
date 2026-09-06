@@ -19,7 +19,8 @@ export default function AdPlayer({
   seconds: number;
   /** What the watcher earns — shown under the countdown. */
   perk: string;
-  onComplete: () => void;
+  /** Called when the ad finishes. `skipped` is true if the user tapped Skip. */
+  onComplete: (skipped: boolean) => void;
 }) {
   const demoEnabled = useDemoStore((s) => s.enabled);
   const [remaining, setRemaining] = useState(seconds);
@@ -36,7 +37,7 @@ export default function AdPlayer({
   useEffect(() => {
     if (remaining === 0 && !doneRef.current) {
       doneRef.current = true;
-      onComplete();
+      onComplete(false); // full ad watched
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [remaining]);
@@ -44,7 +45,7 @@ export default function AdPlayer({
   const skip = () => {
     if (doneRef.current) return;
     doneRef.current = true;
-    onComplete();
+    onComplete(true); // user skipped — no free perk
   };
 
   // Kick playback explicitly too — some browsers ignore the autoplay attribute.

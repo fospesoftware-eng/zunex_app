@@ -43,10 +43,10 @@ export class MockChargingHardware implements ChargingHardware {
     if (scenario === "start_failed") return { ok: false, code: "hardware_start_failed" };
     if (scenario === "station_offline") return { ok: false, code: "hardware_unreachable" };
     const now = Date.now();
-    // Demo: the charge finishes server-side while the client is offline.
-    if (scenario === "network_complete") {
-      return { ok: true, startedAt: now, endsAt: now + 12_000, watts: Math.round(randBetween(27, 33)) };
-    }
+    // The charge always runs for the full plan duration. The "Charging
+    // completed" demo scenario still drops the network client-side, but it
+    // does NOT shorten the charge — use "Fast-forward to completion" in the
+    // demo panel to reach the completed screen quickly.
     return {
       ok: true,
       startedAt: now,

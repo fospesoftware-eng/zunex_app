@@ -186,7 +186,9 @@ export default function WiFiScreen({ onDone }: { onDone: () => void }) {
               <AdPlayer
                 seconds={AD_SECONDS}
                 perk="30 seconds · then free internet"
-                onComplete={() => setStep("done")}
+                onComplete={(skipped) =>
+                  skipped ? setStep("phone") : setStep("done")
+                }
               />
             </motion.section>
           )}

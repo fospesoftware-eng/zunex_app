@@ -43,10 +43,13 @@ async function isCableConnected(): Promise<boolean> {
 export default function FreeChargeScreen({
   submitting,
   onSelect,
+  onSkip,
   onBack,
 }: {
   submitting: boolean;
   onSelect: (planId: string) => void;
+  /** Called when the user skips the ad → falls through to the paid flow. */
+  onSkip: () => void;
   onBack: () => void;
 }) {
   const [watching, setWatching] = useState<(typeof OFFERS)[number] | null>(null);
@@ -160,7 +163,9 @@ export default function FreeChargeScreen({
               <AdPlayer
                 seconds={watching.adSeconds}
                 perk={`${watching.adSeconds}s ad · ${watching.minutes} min free`}
-                onComplete={() => onSelect(watching.planId)}
+                onComplete={(skipped) =>
+                  skipped ? onSkip() : onSelect(watching.planId)
+                }
               />
             </motion.section>
           )}

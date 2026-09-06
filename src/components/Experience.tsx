@@ -70,6 +70,25 @@ export default function Experience({ stationId }: { stationId?: string }) {
   const { remainingMs } = useCountdown(snapshot, clockOffsetRef);
   useWakeLock(snapshot?.state === "charging_active");
 
+  // Safety net: when the local countdown hits zero, the server-side tick may
+  // not have transitioned to charging_completed yet (SSE pushes every 1s,
+  // hardware.stop takes ~800ms). Force a refresh so the completion state is
+  // picked up immediately instead of lingering on 0:00.
+  const lastRefreshRef = useRef(0);
+  useEffect(() => {
+    if (
+      remainingMs <= 0 &&
+      snapshot &&
+      (snapshot.state === "charging_active" || snapshot.state === "stopping")
+    ) {
+      const now = Date.now();
+      if (now - lastRefreshRef.current > 1500) {
+        lastRefreshRef.current = now;
+        void refresh();
+      }
+    }
+  }, [remainingMs, snapshot, refresh]);
+
   // ---- Boot: resolve the station from the QR identifier --------------------
   useEffect(() => {
     if (!normalizedId) {
@@ -357,6 +376,7 @@ export default function Experience({ stationId }: { stationId?: string }) {
           <FreeChargeScreen
             submitting={creating}
             onSelect={(planId) => void choosePlan(planId)}
+            onSkip={() => setPhase("select")}
             onBack={() => setPhase("welcome")}
           />
         )}
