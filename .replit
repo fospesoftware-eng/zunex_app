@@ -1,4 +1,0 @@
-run = "npm run start"
-
-[build]
-command = "npm install && npm run build"
