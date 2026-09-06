@@ -1,5 +1,22 @@
-import mqtt, { type MqttClient } from "mqtt";
 import type { PortTelemetry, StationTelemetry } from "@/lib/core/types";
+
+// mqtt is imported lazily so a failed/absent install never breaks the app —
+// the mock hardware keeps everything running when no broker is configured.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let mqttModule: any | null = null;
+let mqttLoadAttempted = false;
+
+async function loadMqtt(): Promise<typeof import("mqtt") | null> {
+  if (mqttModule) return mqttModule;
+  if (mqttLoadAttempted) return null;
+  mqttLoadAttempted = true;
+  try {
+    mqttModule = await import("mqtt");
+    return mqttModule;
+  } catch {
+    return null;
+  }
+}
 
 // ---------------------------------------------------------------------------
 // MQTT link to the ZUNEX station controllers.
@@ -54,17 +71,23 @@ function applyStationStatus(stationId: string, online: boolean): void {
   telemetryByStation.set(stationId, existing);
 }
 
-let client: MqttClient | null = null;
-let connecting: Promise<MqttClient> | null = null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let client: any | null = null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let connecting: Promise<any> | null = null;
 
-export function getMqttClient(): Promise<MqttClient> | null {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function getMqttClient(): Promise<any | null> {
   if (!isMqttConfigured()) return null;
-  if (client) return Promise.resolve(client);
-  if (!connecting) connecting = createClient();
+  const mqtt = await loadMqtt();
+  if (!mqtt) return null;
+  if (client) return client;
+  if (!connecting) connecting = createClient(mqtt);
   return connecting;
 }
 
-function createClient(): Promise<MqttClient> {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function createClient(mqtt: any): Promise<any> {
   return new Promise((resolve) => {
     const c = mqtt.connect(process.env.ZUNEX_MQTT_URL as string, {
       username: process.env.ZUNEX_MQTT_USERNAME,
@@ -87,7 +110,8 @@ function createClient(): Promise<MqttClient> {
       resolve(c);
     });
 
-    c.on("message", (topic, payload) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    c.on("message", (topic: string, payload: Buffer) => {
       const parts = topic.split("/");
       // [prefix, stationId, kind]
       if (parts.length < 3 || parts[0] !== PREFIX) return;

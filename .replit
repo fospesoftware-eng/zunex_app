@@ -1,0 +1,7 @@
+run = "npm run start"
+
+[build]
+command = "npm run build"
+
+[env]
+PORT = "3000"
