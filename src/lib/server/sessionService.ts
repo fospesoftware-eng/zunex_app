@@ -188,6 +188,19 @@ export const sessionService = {
     return { ok: true as const };
   },
 
+  /** DEMO ONLY — force a payment outcome from the demo panel. */
+  simulatePayment(sessionId: string, outcome: "succeed" | "fail") {
+    const s = store.sessions.get(sessionId);
+    if (!s) return { ok: false as const, code: "session_not_found" };
+    if (s.state !== "payment_pending") return { ok: false as const, code: "invalid_state" };
+    if (outcome === "succeed") {
+      transition(s, ["payment_pending"], "payment_successful", { paidAt: Date.now() });
+    } else {
+      transition(s, ["payment_pending"], "error", { errorCode: "payment_failed" });
+    }
+    return { ok: true as const };
+  },
+
   /** Payment verified → request hardware start → station confirms → active. */
   requestStart(sessionId: string, scenario: string, isRetry = false) {
     const s = store.sessions.get(sessionId);

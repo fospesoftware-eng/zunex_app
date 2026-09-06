@@ -12,6 +12,7 @@ const SCENARIOS: DemoScenario[] = [
   "payment_failed",
   "start_failed",
   "network",
+  "network_complete",
 ];
 
 export function scenarioFromRequest(req: NextRequest): DemoScenario {

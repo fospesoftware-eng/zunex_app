@@ -20,7 +20,8 @@ export type DemoScenario =
   | "station_offline"
   | "payment_failed"
   | "start_failed"
-  | "network";
+  | "network"
+  | "network_complete";
 
 export interface ChargingPlan {
   id: string;
@@ -86,6 +87,54 @@ export interface SessionSnapshot {
 export interface StationPayload {
   station: Station;
   serverTime: number;
+}
+
+// ---------------------------------------------------------------------------
+// Hardware telemetry (MQTT) — reported by the station controller.
+// All fields beyond `connected`/`charging` are best-effort: they depend on
+// what the phone/station electronics can actually report, so every optional
+// field must be treated as "unknown" by consumers.
+// ---------------------------------------------------------------------------
+
+/** What we can learn about the plugged-in phone (when the hardware reports it). */
+export interface DeviceInfo {
+  manufacturer?: string;
+  model?: string;
+  os?: string; // "Android" | "iOS" | ...
+  osVersion?: string;
+  batteryTechnology?: string; // "Li-ion", "Li-poly", ...
+  usbType?: "usb-c" | "micro-usb" | "lightning" | "unknown";
+  fastChargeSupported?: boolean;
+}
+
+/** Live state of one charging port, as reported by the station hardware. */
+export interface PortTelemetry {
+  stationId: string;
+  portId: string;
+  /** A device is physically plugged into this port (cable detected). */
+  connected: boolean;
+  /** Power is actively flowing (device is drawing charge). */
+  charging: boolean;
+  /** Best-effort: battery percentage is only available if the device reports it. */
+  batteryLevelPct?: number | null;
+  powerWatts?: number | null;
+  voltage?: number | null;
+  currentAmps?: number | null;
+  temperatureC?: number | null;
+  device?: DeviceInfo | null;
+  /** Hardware clock when the reading was taken. */
+  reportedAt: number;
+  /** Server clock when MQTT delivered it. */
+  receivedAt: number;
+}
+
+/** Aggregate view of one station as last reported over MQTT. */
+export interface StationTelemetry {
+  stationId: string;
+  /** Station controller reachable on the broker (presence / last-will). */
+  online: boolean;
+  lastSeenAt: number;
+  ports: Record<string, PortTelemetry>;
 }
 
 // ---------------------------------------------------------------------------

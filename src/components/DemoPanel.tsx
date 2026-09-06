@@ -120,6 +120,36 @@ export default function DemoPanel() {
             if (!sid) return null;
             return (
               <div className="mt-4 pt-4 border-t border-white/10 space-y-2">
+                <p className="eyebrow !text-[0.5625rem]">Payment simulation</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <GhostButton
+                    onClick={() => void api.demoPaySimulate(sid, "succeed").catch(() => {})}
+                    className="!py-2.5 !text-xs"
+                    ariaLabel="Simulate payment success"
+                  >
+                    Payment success
+                  </GhostButton>
+                  <GhostButton
+                    onClick={() => void api.demoPaySimulate(sid, "fail").catch(() => {})}
+                    className="!py-2.5 !text-xs"
+                    ariaLabel="Simulate payment failure"
+                  >
+                    Payment failed
+                  </GhostButton>
+                </div>
+                <p className="text-paper-dim text-[0.6875rem] leading-relaxed">
+                  Works while the session is awaiting payment — success moves to
+                  charging, failed shows the payment error screen.
+                </p>
+              </div>
+            );
+          })()}
+
+          {(() => {
+            const sid = findActiveSessionId();
+            if (!sid) return null;
+            return (
+              <div className="mt-4 pt-4 border-t border-white/10 space-y-2">
                 <p className="eyebrow !text-[0.5625rem]">Session controls</p>
                 <GhostButton
                   onClick={() => void api.demoFinish(sid).catch(() => {})}

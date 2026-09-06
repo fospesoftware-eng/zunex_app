@@ -1,9 +1,17 @@
 import { randBetween, sleep } from "@/lib/server/demo";
+import {
+  awaitCommandAck,
+  getStationTelemetry,
+  isMqttConfigured,
+  publishCommand,
+} from "@/lib/server/mqtt";
+import type { PortTelemetry, StationTelemetry } from "@/lib/core/types";
 
 // ---------------------------------------------------------------------------
 // Hardware abstraction. The UI and session service only ever speak to this
-// interface — swap MockChargingHardware for a real station controller
-// (MQTT/Modbus/HTTP) without touching any other layer.
+// interface — swap MockChargingHardware for the MQTT-backed controller
+// without touching any other layer. ZUNEX_MQTT_URL selects the MQTT
+// implementation; demo scenarios always ride the mock so they stay testable.
 // ---------------------------------------------------------------------------
 
 export interface StartCommand {
@@ -24,6 +32,8 @@ export interface StopResult {
 export interface ChargingHardware {
   start(cmd: StartCommand, scenario: string): Promise<StartResult>;
   stop(cmd: StartCommand, scenario: string): Promise<StopResult>;
+  /** Latest port telemetry from the field, if the station reports it. */
+  telemetry(stationId: string): Promise<StationTelemetry | null>;
 }
 
 export class MockChargingHardware implements ChargingHardware {
@@ -33,6 +43,10 @@ export class MockChargingHardware implements ChargingHardware {
     if (scenario === "start_failed") return { ok: false, code: "hardware_start_failed" };
     if (scenario === "station_offline") return { ok: false, code: "hardware_unreachable" };
     const now = Date.now();
+    // Demo: the charge finishes server-side while the client is offline.
+    if (scenario === "network_complete") {
+      return { ok: true, startedAt: now, endsAt: now + 12_000, watts: Math.round(randBetween(27, 33)) };
+    }
     return {
       ok: true,
       startedAt: now,
@@ -41,10 +55,79 @@ export class MockChargingHardware implements ChargingHardware {
     };
   }
 
-  async stop(cmd: StartCommand, _scenario: string): Promise<StopResult> {
+  async stop(_cmd: StartCommand, _scenario: string): Promise<StopResult> {
     await sleep(randBetween(600, 900));
     return { ok: true, stoppedAt: Date.now() };
   }
+
+  async telemetry(): Promise<StationTelemetry | null> {
+    return null; // the mock has no field hardware behind it
+  }
 }
 
-export const chargingHardware: ChargingHardware = new MockChargingHardware();
+const ACK_TIMEOUT_MS = 8_000;
+
+function newRequestId(): string {
+  return `req_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+/**
+ * Real station controller over MQTT. Publishes commands and waits for the
+ * station's ack; telemetry arrives asynchronously and is served from the
+ * MQTT link's cache.
+ */
+export class MqttChargingHardware implements ChargingHardware {
+  async start(cmd: StartCommand, scenario: string): Promise<StartResult> {
+    // Demo scenarios keep using the mock so they stay deterministic.
+    if (scenario !== "default") return mock.start(cmd, scenario);
+
+    const requestId = newRequestId();
+    await publishCommand(cmd.stationId, "start", {
+      requestId,
+      sessionId: cmd.sessionId,
+      minutes: cmd.minutes,
+    });
+    const ack = await awaitCommandAck(cmd.stationId, "start", requestId, ACK_TIMEOUT_MS);
+    if (!ack || ack.ok === false) {
+      return { ok: false, code: ack?.code === "hardware_start_failed" ? "hardware_start_failed" : "hardware_unreachable" };
+    }
+
+    // The station owns the real schedule; the server mirrors it for the UI.
+    // The ack may carry actuals; fall back to a plan-length window.
+    const startedAt = Date.now();
+    const minutes = cmd.minutes;
+    return {
+      ok: true,
+      startedAt,
+      endsAt: startedAt + minutes * 60_000,
+      watts: 30,
+    };
+  }
+
+  async stop(cmd: StartCommand, scenario: string): Promise<StopResult> {
+    if (scenario !== "default") return mock.stop(cmd, scenario);
+
+    const requestId = newRequestId();
+    await publishCommand(cmd.stationId, "stop", { requestId, sessionId: cmd.sessionId });
+    const ack = await awaitCommandAck(cmd.stationId, "stop", requestId, ACK_TIMEOUT_MS);
+    return { ok: Boolean(ack?.ok ?? true), stoppedAt: Date.now() };
+  }
+
+  async telemetry(stationId: string): Promise<StationTelemetry | null> {
+    return getStationTelemetry(stationId);
+  }
+}
+
+export const mock = new MockChargingHardware();
+
+/**
+ * Selected hardware backend:
+ *  - ZUNEX_MQTT_URL set    → real stations over MQTT (demo scenarios → mock)
+ *  - otherwise (default)   → mock, so demo/preview runs with zero infra
+ */
+export const chargingHardware: ChargingHardware = isMqttConfigured()
+  ? new MqttChargingHardware()
+  : mock;
+
+export type { PortTelemetry };
+

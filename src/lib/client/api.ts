@@ -26,18 +26,23 @@ export class ApiError extends Error {
   }
 }
 
-// Simulated outage state for the `network` demo scenario.
-let outageStarted = false;
+// Simulated outage state for the `network` / `network_complete` demo scenarios.
+let outageStart = 0;
 let outageUntil = 0;
+
+function armOutage(delayMs: number, durationMs: number): void {
+  outageStart = Date.now() + delayMs;
+  outageUntil = outageStart + durationMs;
+}
 
 function maybeSimulateOutage(): void {
   const { scenario } = useDemoStore.getState();
-  if (scenario !== "network") return;
-  if (!outageStarted) {
-    outageStarted = true;
-    outageUntil = Date.now() + 8000;
+  if (scenario === "network" && !outageUntil) {
+    armOutage(0, 8000);
   }
-  if (Date.now() < outageUntil) {
+  // `network_complete` is armed by startCharging — the outage begins a few
+  // seconds into the charge while the server finishes it behind the blackout.
+  if (outageUntil && Date.now() >= outageStart && Date.now() < outageUntil) {
     throw new ApiError("network", "You appear to be offline.", 0);
   }
 }
@@ -104,11 +109,17 @@ export const api = {
       { method: "POST" },
     ),
 
-  startCharging: (sessionId: string, retry = false) =>
-    request<{ snapshot: SessionSnapshot }>(
+  startCharging: async (sessionId: string, retry = false) => {
+    const res = await request<{ snapshot: SessionSnapshot }>(
       `/api/sessions/${encodeURIComponent(sessionId)}/start${retry ? "?retry=1" : ""}`,
       { method: "POST" },
-    ),
+    );
+    // Arm the blackout a few seconds into the charge — the server completes
+    // the session (12s end) while the client is cut off.
+    const { scenario } = useDemoStore.getState();
+    if (scenario === "network_complete") armOutage(4000, 12000);
+    return res;
+  },
 
   cancelSession: (sessionId: string) =>
     request<{ snapshot: SessionSnapshot }>(
@@ -121,5 +132,12 @@ export const api = {
     request<{ snapshot: SessionSnapshot }>(
       `/api/sessions/${encodeURIComponent(sessionId)}/demo/finish`,
       { method: "POST" },
+    ),
+
+  /** Demo-only: force a payment outcome from the demo panel. */
+  demoPaySimulate: (sessionId: string, outcome: "succeed" | "fail") =>
+    request<{ ok: boolean }>(
+      `/api/sessions/${encodeURIComponent(sessionId)}/demo/payment`,
+      { method: "POST", body: JSON.stringify({ outcome }) },
     ),
 };

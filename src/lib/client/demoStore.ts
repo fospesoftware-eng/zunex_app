@@ -14,6 +14,11 @@ const SCENARIOS: { id: DemoScenario; label: string; hint: string }[] = [
   { id: "payment_failed", label: "Payment fails", hint: "UPI verification declines" },
   { id: "start_failed", label: "Start fails", hint: "Payment ok, hardware refuses" },
   { id: "network", label: "Network drops", hint: "8s outage, then auto-recovery" },
+  {
+    id: "network_complete",
+    label: "Charging completed",
+    hint: "Charge finishes on the server and syncs to the app after a network outage",
+  },
 ];
 
 const LS_KEY = "zunex:demo-scenario";

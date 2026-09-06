@@ -264,6 +264,21 @@ button {
   cursor: default;
 }
 
+/* Finish variant — same liquid gradient as the ChargeSeal disc above it */
+.btn-seal {
+  background:
+    radial-gradient(circle at 32% 22%, rgba(255, 255, 255, 0.18), transparent 46%),
+    radial-gradient(circle at 66% 80%, rgba(58, 91, 255, 0.3), transparent 58%),
+    radial-gradient(circle at 30% 76%, rgba(36, 71, 255, 0.32), transparent 60%),
+    linear-gradient(160deg, #131a44 0%, #060812 100%);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.4),
+    0 14px 44px -12px rgba(36, 71, 255, 0.5),
+    0 0 30px -8px rgba(74, 99, 255, 0.4);
+}
+
 .btn-ghost {
   display: inline-flex;
   align-items: center;
@@ -693,7 +708,7 @@ button {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.8rem 0;
+  padding: 0.45rem 0;
 }
 
 /* ---------------------------------------------------------------------------
@@ -1609,130 +1624,45 @@ button {
 }
 
 /* ---------------------------------------------------------------------------
-   AdPlayer — the sponsored slot
+   AdPlayer — full-screen video ad overlay
 --------------------------------------------------------------------------- */
 
-.ad-shell {
-  position: relative;
+.ad-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
   display: flex;
   flex-direction: column;
+  justify-content: flex-end;
   overflow: hidden;
-  border-radius: 1.75rem;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 40px 90px -50px rgba(0, 0, 0, 1);
-  background: linear-gradient(165deg, #0a0d1f 0%, #04050a 100%);
+  background: #000;
 }
 
-.ad-stage {
-  position: relative;
-  height: min(56vh, 380px);
-  overflow: hidden;
-}
-
-.ad-aurora {
-  position: absolute;
-  inset: -30%;
-  background:
-    radial-gradient(38% 32% at 24% 30%, rgba(36, 71, 255, 0.4), transparent 70%),
-    radial-gradient(34% 30% at 78% 62%, rgba(255, 176, 32, 0.16), transparent 70%),
-    radial-gradient(30% 28% at 60% 20%, rgba(125, 237, 196, 0.12), transparent 70%);
-  filter: blur(28px);
-  animation: ad-drift 11s ease-in-out infinite alternate;
-}
-
-@keyframes ad-drift {
-  from {
-    transform: translate3d(-4%, -3%, 0) rotate(-2deg) scale(1);
-  }
-  to {
-    transform: translate3d(4%, 4%, 0) rotate(2.5deg) scale(1.08);
-  }
-}
-
-.ad-beam {
+.ad-video {
   position: absolute;
   inset: 0;
-  background:
-    linear-gradient(105deg, transparent 42%, rgba(255, 255, 255, 0.05) 50%, transparent 58%),
-    linear-gradient(180deg, transparent 55%, rgba(4, 5, 10, 0.9) 100%);
-  animation: ad-sheen 5.5s ease-in-out infinite;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
-@keyframes ad-sheen {
-  0%,
-  100% {
-    opacity: 0.5;
-    transform: translateX(-6%);
-  }
-  50% {
-    opacity: 1;
-    transform: translateX(6%);
-  }
-}
-
-.ad-orb {
-  position: absolute;
-  top: 26%;
-  left: 50%;
-  width: 128px;
-  height: 128px;
-  margin-left: -64px;
-}
-
-.ad-orb-core {
-  position: absolute;
-  inset: 14px;
-  border-radius: 999px;
-  background:
-    radial-gradient(circle at 32% 26%, rgba(255, 255, 255, 0.35), transparent 45%),
-    radial-gradient(circle at 68% 76%, rgba(36, 71, 255, 0.65), transparent 62%),
-    linear-gradient(160deg, #131a44, #06081a);
-  box-shadow:
-    0 0 44px rgba(74, 99, 255, 0.5),
-    inset 0 0 22px rgba(125, 151, 255, 0.25);
-}
-
-.ad-orb-ring {
-  position: absolute;
-  inset: 0;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 194, 77, 0.4);
-  animation: ad-ring-spin 7s linear infinite;
-  mask: conic-gradient(from 0deg, black 0 62%, transparent 78% 100%);
-  -webkit-mask: conic-gradient(from 0deg, black 0 62%, transparent 78% 100%);
-}
-
-@keyframes ad-ring-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.ad-copy {
+/* legibility scrim behind the chrome + progress bar */
+.ad-scrim {
   position: absolute;
   left: 0;
   right: 0;
-  bottom: 26px;
-  display: flex;
-  justify-content: center;
-  padding: 0 24px;
-}
-
-.ad-tagline {
-  font-size: 1.05rem;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-  color: var(--color-paper);
-  text-shadow: 0 2px 22px rgba(0, 0, 0, 0.8);
+  bottom: 0;
+  height: 128px;
+  background: linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, 0.62) 78%, rgba(0, 0, 0, 0.82) 100%);
+  pointer-events: none;
 }
 
 .ad-chrome {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px 16px;
-  background: rgba(4, 5, 10, 0.72);
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 12px 16px 10px;
 }
 
 .ad-badge {
@@ -1750,7 +1680,7 @@ button {
   flex: 1;
   min-width: 0;
   font-size: 0.75rem;
-  color: var(--color-paper-dim);
+  color: rgba(255, 255, 255, 0.85);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1763,7 +1693,7 @@ button {
   gap: 5px;
   font-size: 0.8rem;
   font-weight: 600;
-  color: var(--color-paper);
+  color: #fff;
   font-variant-numeric: tabular-nums;
 }
 
@@ -1786,8 +1716,9 @@ button {
 }
 
 .ad-progress {
-  height: 3px;
-  background: rgba(255, 255, 255, 0.08);
+  position: relative;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.14);
 }
 
 .ad-progress-fill {

@@ -34,12 +34,13 @@ export default function CompleteScreen({
         initial={{ opacity: 0, y: -12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.7, ease }}
+        className="pb-6"
       >
         <BrandHeader />
       </motion.header>
 
-      <main className="flex-1 flex flex-col items-center justify-center gap-7">
-        <ChargeSeal />
+      <main className="flex-1 flex flex-col items-center justify-center gap-4">
+        <ChargeSeal size="min(56vw, 28vh, 234px)" />
 
         <motion.div
           className="text-center"
@@ -78,12 +79,14 @@ export default function CompleteScreen({
       </main>
 
       <motion.footer
-        className="pt-7 flex flex-col gap-3 max-w-sm w-full mx-auto"
+        className="pt-3 flex flex-col gap-3 max-w-sm w-full mx-auto"
         initial={{ opacity: 0, y: 24 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.8, delay: 0.5, ease }}
       >
-        <GlowButton onClick={onDone}>Finish</GlowButton>
+        <GlowButton className="btn-seal" onClick={onDone}>
+          Finish
+        </GlowButton>
       </motion.footer>
     </div>
   );
