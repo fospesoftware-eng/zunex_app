@@ -2,7 +2,3 @@ run = "npm run start"
 
 [build]
 command = "npm install && npm run build"
-
-[env]
-PORT = "3000"
-NODE_ENV = "production"
