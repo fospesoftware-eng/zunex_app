@@ -1,11 +1,52 @@
 "use client";
 
-import { useEffect } from "react";
+import { Component, useEffect, type ErrorInfo, type ReactNode } from "react";
 import Backdrop from "@/components/visuals/Backdrop";
 import DeviceGate from "@/components/screens/DeviceGate";
 import Experience from "@/components/Experience";
 import DemoPanel from "@/components/DemoPanel";
 import { useDemoStore } from "@/lib/client/demoStore";
+
+// ---------------------------------------------------------------------------
+// Error boundary — surfaces any client-side crash instead of a blank screen.
+// ---------------------------------------------------------------------------
+
+class ErrorBoundary extends Component<
+  { children: ReactNode },
+  { hasError: boolean; message: string }
+> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { hasError: false, message: "" };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, message: error.message };
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    // eslint-disable-next-line no-console
+    console.error("App error:", error, info);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="app-viewport safe-x safe-top safe-bottom flex flex-col items-center justify-center gap-4 p-8 text-center">
+          <h1 className="text-xl font-display text-paper">Something went wrong</h1>
+          <p className="text-sm text-paper-dim">{this.state.message}</p>
+          <button
+            onClick={() => location.reload()}
+            className="btn-glow px-6 py-3 text-sm"
+          >
+            Reload
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 // ---------------------------------------------------------------------------
 // App shell — ambient scene + device gate + the experience + demo controls.
@@ -35,7 +76,7 @@ export default function App({
   }, []);
 
   return (
-    <>
+    <ErrorBoundary>
       <Backdrop />
       <div className="relative z-10">
         <DeviceGate>
@@ -43,6 +84,6 @@ export default function App({
         </DeviceGate>
       </div>
       <DemoPanel />
-    </>
+    </ErrorBoundary>
   );
 }
