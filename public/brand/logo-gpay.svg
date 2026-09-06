@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Google Pay app icon -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <rect width="64" height="64" rx="14.5" fill="#FFFFFF"/>
+  <g transform="translate(6 20)">
+    <path fill="#EA4335" d="M12 4.8c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.23 0 12 0 7.31 0 3.26 2.69 1.28 6.61l3.99 3.09C6.22 6.93 8.87 4.8 12 4.8z"/>
+    <path fill="#4285F4" d="M23.49 12.27c0-.79-.07-1.54-.19-2.27H12v4.51h6.47c-.29 1.48-1.14 2.73-2.4 3.58l3.87 3c2.26-2.09 3.55-5.17 3.55-8.82z"/>
+    <path fill="#FBBC05" d="M5.27 14.3c-.25-.72-.38-1.49-.38-2.3s.14-1.58.38-2.3L1.28 6.61C.46 8.24 0 10.06 0 12s.46 3.76 1.28 5.39l3.99-3.09z"/>
+    <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.94-2.91l-3.87-3c-1.08.72-2.45 1.16-4.07 1.16-3.13 0-5.78-2.13-6.73-4.9l-3.99 3.09C3.26 21.31 7.31 24 12 24z"/>
+  </g>
+  <text x="45" y="37" text-anchor="middle" font-family="'Product Sans','Google Sans',Arial,sans-serif" font-size="14.5" font-weight="500" fill="#5F6368">Pay</text>
+</svg>

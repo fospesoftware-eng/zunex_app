@@ -1,0 +1,12 @@
+{
+  "name": "ZUNEX Charging",
+  "short_name": "ZUNEX",
+  "description": "Premium charging experience by ZUNEX",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#04050a",
+  "theme_color": "#04050a",
+  "icons": [
+    { "src": "/brand/zunex-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
