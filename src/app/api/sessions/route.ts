@@ -1,6 +1,12 @@
 import { jsonError, jsonOk, scenarioFromRequest } from "@/lib/server/http";
 import { getStation } from "@/lib/server/stations";
 import { sessionService } from "@/lib/server/sessionService";
+import {
+  MAX_BODY_BYTES,
+  isValidPlanId,
+  isValidStationId,
+  rateLimitOrResponse,
+} from "@/lib/server/security";
 import type { NextRequest } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -11,6 +17,14 @@ interface CreateBody {
 }
 
 export async function POST(req: NextRequest) {
+  // Rate-limit session creation per IP to blunt memory-pressure floods.
+  const blocked = rateLimitOrResponse(req, 30, 60_000, "sessions:create");
+  if (blocked) return blocked;
+
+  // Reject oversized bodies early.
+  const contentLength = Number(req.headers.get("content-length") ?? "0");
+  if (contentLength > MAX_BODY_BYTES) return jsonError("invalid_request", "Body too large", 413);
+
   const scenario = scenarioFromRequest(req);
   let body: CreateBody;
   try {
@@ -19,6 +33,8 @@ export async function POST(req: NextRequest) {
     return jsonError("invalid_request", "Malformed body");
   }
   if (!body.stationId || !body.planId) return jsonError("invalid_request");
+  if (!isValidStationId(body.stationId) || !isValidPlanId(body.planId))
+    return jsonError("invalid_request");
 
   const station = getStation(body.stationId, scenario);
   if ("error" in station) return jsonError("station_not_found", undefined, 404);

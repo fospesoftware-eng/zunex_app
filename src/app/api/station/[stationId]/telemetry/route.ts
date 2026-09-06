@@ -1,4 +1,5 @@
 import { jsonError, jsonOk } from "@/lib/server/http";
+import { isAdminAuthorized } from "@/lib/server/security";
 import { chargingHardware } from "@/lib/server/hardware";
 import type { NextRequest } from "next/server";
 
@@ -11,11 +12,14 @@ export const dynamic = "force-dynamic";
  * connection, charging status, power/voltage/current, and whatever device
  * details the station can read (model, OS, battery %, ...).
  * 404 when nothing has been reported (e.g. MQTT not configured — mock backend).
+ *
+ * Admin-only in production — exposes end-user device data.
  */
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ stationId: string }> },
 ) {
+  if (!isAdminAuthorized(req)) return jsonError("unauthorized", "Not available", 403);
   const { stationId } = await params;
 
   const telemetry = await chargingHardware.telemetry(stationId);

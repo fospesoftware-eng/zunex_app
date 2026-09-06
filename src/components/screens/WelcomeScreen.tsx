@@ -57,7 +57,6 @@ export default function WelcomeScreen({
           <Icon name="wifi" size={15} />
           WiFi
         </button>
-        <span className="quick-actions-divider" aria-hidden="true" />
         <button
           type="button"
           className="quick-action"

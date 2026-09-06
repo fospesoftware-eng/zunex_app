@@ -1247,12 +1247,6 @@ button {
   opacity: 0.4;
 }
 
-.quick-actions-divider {
-  width: 1px;
-  height: 16px;
-  background: rgba(255, 255, 255, 0.12);
-}
-
 /* ---------------------------------------------------------------------------
    Flow screens (WiFi · Free charge) — shared glass card and form pieces
 --------------------------------------------------------------------------- */

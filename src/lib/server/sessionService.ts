@@ -6,12 +6,34 @@ import type {
 import { friendlyError } from "@/lib/core/types";
 import { chargingHardware } from "@/lib/server/hardware";
 import { paymentProvider } from "@/lib/server/payments";
-import { FREE_PLANS, PLANS, PAYMENT_PENDING_TTL_MS, store, type SessionRecord } from "@/lib/server/store";
+import {
+  FREE_PLANS,
+  PLANS,
+  PAYMENT_PENDING_TTL_MS,
+  store,
+  sweepStore,
+  type SessionRecord,
+} from "@/lib/server/store";
 
 // ---------------------------------------------------------------------------
 // Session service — the stateful orchestrator. Every mutation goes through
 // guarded transitions so duplicate/replayed requests are safe (idempotent).
 // ---------------------------------------------------------------------------
+
+let lastSweepAt = 0;
+const SWEEP_INTERVAL_MS = 60_000; // sweep at most once per minute
+
+/** Opportunistically sweep stale sessions (throttled). */
+function maybeSweep(): void {
+  const now = Date.now();
+  if (now - lastSweepAt < SWEEP_INTERVAL_MS) return;
+  lastSweepAt = now;
+  try {
+    sweepStore();
+  } catch {
+    /* sweep must never break request handling */
+  }
+}
 
 function transition(
   s: SessionRecord,
@@ -256,6 +278,7 @@ export const sessionService = {
   },
 
   snapshot(sessionId: string): SessionSnapshot | null {
+    maybeSweep();
     const s = store.sessions.get(sessionId);
     if (!s) return null;
     return toSnapshot(s);

@@ -1,4 +1,5 @@
 import { sessionService } from "@/lib/server/sessionService";
+import { rateLimitOrResponse } from "@/lib/server/security";
 import type { NextRequest } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -12,6 +13,10 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ sessionId: string }> },
 ) {
+  // Limit concurrent SSE connections per IP to avoid resource exhaustion.
+  const blocked = rateLimitOrResponse(req, 10, 60_000, "sessions:events");
+  if (blocked) return blocked;
+
   const { sessionId } = await params;
   const encoder = new TextEncoder();
 

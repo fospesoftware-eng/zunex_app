@@ -53,6 +53,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers);
   // Presence of the header marks demo mode; its value selects the scenario.
   if (enabled) headers.set("x-zunex-demo", scenario);
+  // Demo endpoints require a shared secret in production. NEXT_PUBLIC_ var is
+  // only set when the operator wants the demo panel active in production.
+  const demoToken = process.env.NEXT_PUBLIC_ZUNEX_DEMO_TOKEN;
+  if (enabled && demoToken) headers.set("x-zunex-demo-token", demoToken);
   if (init?.body) headers.set("Content-Type", "application/json");
 
   let res: Response;

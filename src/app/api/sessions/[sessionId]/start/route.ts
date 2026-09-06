@@ -1,5 +1,6 @@
 import { jsonError, jsonOk, scenarioFromRequest } from "@/lib/server/http";
 import { sessionService } from "@/lib/server/sessionService";
+import { rateLimitOrResponse } from "@/lib/server/security";
 import type { NextRequest } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -14,6 +15,9 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ sessionId: string }> },
 ) {
+  const blocked = rateLimitOrResponse(req, 20, 60_000, "sessions:start");
+  if (blocked) return blocked;
+
   const { sessionId } = await params;
   const scenario = scenarioFromRequest(req);
   const url = new URL(req.url);
