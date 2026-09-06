@@ -42,6 +42,11 @@ body {
   height: 100%;
 }
 
+html {
+  /* Fullscreen PWA / edge-to-edge: never let a browser bar eat the layout */
+  background: var(--color-ink-950);
+}
+
 body {
   background: var(--color-ink-950);
   color: var(--color-paper);
@@ -50,6 +55,14 @@ body {
   -moz-osx-font-smoothing: grayscale;
   overscroll-behavior-y: none;
   text-rendering: optimizeLegibility;
+}
+
+/* When installed (standalone/fullscreen), lock overscroll so the experience
+   feels native. The app is viewport-locked by design (100dvh + safe areas). */
+@media (display-mode: standalone), (display-mode: fullscreen) {
+  body {
+    overscroll-behavior: none;
+  }
 }
 
 ::selection {
@@ -1180,6 +1193,7 @@ button {
 
 .app-viewport {
   position: relative;
+  min-height: 100vh;
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
@@ -1245,6 +1259,15 @@ button {
 
 .quick-action:disabled {
   opacity: 0.4;
+}
+
+/* Icon-only quick action (scan) — a small circular glass button */
+.quick-action-icon {
+  padding: 0;
+  width: 40px;
+  height: 40px;
+  justify-content: center;
+  border-radius: 999px;
 }
 
 /* ---------------------------------------------------------------------------
@@ -1618,6 +1641,106 @@ button {
 }
 
 /* ---------------------------------------------------------------------------
+   QrScanner — full-screen camera overlay for scanning the station QR
+--------------------------------------------------------------------------- */
+
+.qr-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 95;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #05070d;
+}
+
+.qr-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.qr-scrim {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(120% 80% at 50% 42%, transparent 42%, rgba(4, 5, 10, 0.72) 100%),
+    linear-gradient(180deg, rgba(4, 5, 10, 0.55), transparent 30%, transparent 64%, rgba(4, 5, 10, 0.82));
+}
+
+.qr-topbar {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: calc(var(--safe-top, 0px) + 14px) 16px 14px;
+}
+
+.qr-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.86rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--color-paper);
+}
+
+.qr-close {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  color: var(--color-paper);
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.qr-close:active {
+  transform: scale(0.94);
+}
+
+.qr-frame {
+  position: relative;
+  z-index: 1;
+  width: min(72vw, 280px);
+  aspect-ratio: 1;
+  margin: auto;
+}
+
+.qr-footer {
+  position: relative;
+  z-index: 2;
+  padding: 0 28px calc(var(--safe-bottom, 0px) + 36px);
+  text-align: center;
+}
+
+.qr-hint {
+  font-size: 0.82rem;
+  color: rgba(242, 245, 255, 0.82);
+  letter-spacing: 0.01em;
+}
+
+.qr-message {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 22px 20px;
+  border-radius: 1.2rem;
+  background: rgba(10, 13, 23, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+/* ---------------------------------------------------------------------------
    AdPlayer — full-screen video ad overlay
 --------------------------------------------------------------------------- */
 
@@ -1720,6 +1843,105 @@ button {
   background: linear-gradient(90deg, var(--color-signal-500), var(--color-amber-400));
   box-shadow: 0 0 12px rgba(74, 99, 255, 0.55);
   transition: width 1s linear;
+}
+
+/* ---------------------------------------------------------------------------
+   Install banner — slides in from the top, invites mobile users to install
+--------------------------------------------------------------------------- */
+
+.install-banner {
+  position: fixed;
+  top: calc(var(--safe-top, 0px) + 10px);
+  left: 12px;
+  right: 12px;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 11px 12px 11px 12px;
+  border-radius: 1.1rem;
+  background: linear-gradient(180deg, rgba(20, 24, 44, 0.92), rgba(10, 12, 24, 0.92));
+  border: 1px solid rgba(125, 151, 255, 0.28);
+  box-shadow:
+    0 0 0 1px rgba(74, 99, 255, 0.12),
+    0 22px 50px -20px rgba(36, 71, 255, 0.55),
+    0 12px 30px -18px rgba(0, 0, 0, 0.9);
+  backdrop-filter: blur(18px) saturate(150%);
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
+}
+
+.install-icon {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  color: #dfe6ff;
+  background: linear-gradient(160deg, rgba(125, 151, 255, 0.35), rgba(36, 71, 255, 0.18));
+  border: 1px solid rgba(157, 180, 255, 0.4);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 6px 16px -8px rgba(36, 71, 255, 0.7);
+}
+
+.install-copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.install-title {
+  font-size: 0.86rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--color-paper);
+  line-height: 1.25;
+}
+
+.install-hint {
+  font-size: 0.72rem;
+  color: var(--color-paper-dim);
+  line-height: 1.35;
+  margin-top: 2px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.install-btn {
+  flex-shrink: 0;
+  padding: 8px 16px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #0a0e1c;
+  background: linear-gradient(180deg, #cdd8ff, #8fa4ff);
+  border: 0;
+  box-shadow: 0 8px 20px -8px rgba(125, 151, 255, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  transition: transform 0.15s ease, box-shadow 0.2s ease;
+}
+
+.install-btn:active {
+  transform: scale(0.95);
+}
+
+.install-close {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  color: var(--color-paper-dim);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: color 0.2s ease, background 0.2s ease;
+}
+
+.install-close:active {
+  color: var(--color-paper);
+  background: rgba(255, 255, 255, 0.12);
 }
 
 /* ---------------------------------------------------------------------------

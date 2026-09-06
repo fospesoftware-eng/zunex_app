@@ -20,6 +20,7 @@ const OFFERS: {
   minutes: number;
   blurb: string;
 }[] = [
+  { planId: "free1", adSeconds: 15, minutes: 1, blurb: "A quick sip of power" },
   { planId: "free5", adSeconds: 30, minutes: 5, blurb: "Quick splash of energy" },
   { planId: "free10", adSeconds: 60, minutes: 10, blurb: "A proper breather" },
 ];

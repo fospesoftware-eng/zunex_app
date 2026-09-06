@@ -178,7 +178,10 @@ export type IconName =
   | "phone"
   | "card"
   | "leaf"
-  | "wifi";
+  | "wifi"
+  | "share"
+  | "download"
+  | "qr";
 
 const PATHS: Record<IconName, ReactNode> = {
   bolt: <path d="M13 2 4.8 13.4h5.9L9.4 22l8.7-12.4h-6L13 2Z" fill="currentColor" stroke="none" />,
@@ -248,6 +251,37 @@ const PATHS: Record<IconName, ReactNode> = {
       <path d="M5.9 12.6a9.4 9.4 0 0 1 12.2 0" />
       <path d="M9 16a4.8 4.8 0 0 1 6 0" />
       <circle cx="12" cy="19.3" r="1.15" fill="currentColor" stroke="none" />
+    </>
+  ),
+  share: (
+    <>
+      <path d="M12 15.5V3.5" />
+      <path d="m7.8 7.6 4.2-4.2 4.2 4.2" />
+      <path d="M4.5 11.5v7A2.5 2.5 0 0 0 7 21h10a2.5 2.5 0 0 0 2.5-2.5v-7" />
+    </>
+  ),
+  download: (
+    <>
+      <path d="M12 3v11" />
+      <path d="m7.8 9.8 4.2 4.2 4.2-4.2" />
+      <path d="M4.5 15.5v3A2.5 2.5 0 0 0 7 21h10a2.5 2.5 0 0 0 2.5-2.5v-3" />
+    </>
+  ),
+  qr: (
+    <>
+      {/* Viewfinder corner brackets — the "scanner" frame */}
+      <path d="M4 9.5V6.5A2.5 2.5 0 0 1 6.5 4h3" />
+      <path d="M14.5 4h3A2.5 2.5 0 0 1 20 6.5v3" />
+      <path d="M20 14.5v3a2.5 2.5 0 0 1-2.5 2.5h-3" />
+      <path d="M9.5 20h-3A2.5 2.5 0 0 1 4 17.5v-3" />
+      {/* Mini QR code centred in the frame */}
+      <rect x="8.7" y="8.7" width="2.3" height="2.3" rx="0.4" fill="currentColor" stroke="none" />
+      <rect x="13" y="8.7" width="2.3" height="2.3" rx="0.4" fill="currentColor" stroke="none" />
+      <rect x="8.7" y="13" width="2.3" height="2.3" rx="0.4" fill="currentColor" stroke="none" />
+      <rect x="11.6" y="11.6" width="1.1" height="1.1" fill="currentColor" stroke="none" />
+      <rect x="13.5" y="13.5" width="1.8" height="1.8" rx="0.3" fill="currentColor" stroke="none" />
+      {/* Sweeping scan line */}
+      <path d="M8.5 12h7" strokeLinecap="round" />
     </>
   ),
 };

@@ -5,6 +5,7 @@ import Backdrop from "@/components/visuals/Backdrop";
 import DeviceGate from "@/components/screens/DeviceGate";
 import Experience from "@/components/Experience";
 import DemoPanel from "@/components/DemoPanel";
+import InstallPrompt from "@/components/visuals/InstallPrompt";
 import { useDemoStore } from "@/lib/client/demoStore";
 
 // ---------------------------------------------------------------------------
@@ -72,6 +73,16 @@ export default function App({
         /* ignore */
       }
     }
+
+    // Register the PWA service worker in production — this makes the app
+    // installable so it opens edge-to-edge (fullscreen) from the home screen.
+    if (process.env.NODE_ENV === "production" && "serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("/sw.js").catch(() => {
+          /* offline/PWA nicety — never block the app on it */
+        });
+      });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -83,6 +94,7 @@ export default function App({
           <Experience stationId={stationId} />
         </DeviceGate>
       </div>
+      <InstallPrompt />
       <DemoPanel />
     </ErrorBoundary>
   );

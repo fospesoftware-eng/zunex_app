@@ -1,15 +1,17 @@
 "use client";
 
+import { useState } from "react";
 import { motion } from "framer-motion";
 import type { Station } from "@/lib/core/types";
 import { BrandHeader } from "@/components/brand/Logo";
 import ChargeBubble from "@/components/visuals/ChargeBubble";
+import QrScanner from "@/components/visuals/QrScanner";
 import { Icon } from "@/components/ui/kit";
 
 // ---------------------------------------------------------------------------
 // WelcomeScreen — the object is the interface. A single floating charge
 // bubble under the wordmark; tapping it splashes into the journey. Quick
-// actions (WiFi · free charge) live quietly at the bottom.
+// actions (scan · WiFi · free charge) live quietly at the bottom.
 // ---------------------------------------------------------------------------
 
 const ease = [0.22, 1, 0.36, 1] as const;
@@ -26,6 +28,7 @@ export default function WelcomeScreen({
   onFreeCharge: () => void;
 }) {
   const available = station.status === "available";
+  const [scanning, setScanning] = useState(false);
 
   return (
     <div className="app-viewport safe-x safe-top safe-bottom">
@@ -53,6 +56,14 @@ export default function WelcomeScreen({
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.7, delay: 0.45, ease }}
       >
+        <button
+          type="button"
+          className="quick-action quick-action-icon"
+          aria-label="Scan station QR code"
+          onClick={() => setScanning(true)}
+        >
+          <Icon name="qr" size={19} />
+        </button>
         <button type="button" className="quick-action" onClick={onWiFi}>
           <Icon name="wifi" size={15} />
           WiFi
@@ -67,6 +78,8 @@ export default function WelcomeScreen({
           Free charge
         </button>
       </motion.footer>
+
+      <QrScanner open={scanning} onClose={() => setScanning(false)} />
     </div>
   );
 }

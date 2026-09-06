@@ -69,6 +69,7 @@ export const PLANS: ChargingPlan[] = [
 // Ad-sponsored plans — earned by watching an ad, never listed on the station
 // board. Sessions created on these skip payment entirely.
 export const FREE_PLANS: ChargingPlan[] = [
+  { id: "free1", minutes: 1, pricePaise: 0, label: "Free sip", tagline: "15s ad · 1 min free" },
   { id: "free5", minutes: 5, pricePaise: 0, label: "Free top-up", tagline: "30s ad · 5 min free" },
   { id: "free10", minutes: 10, pricePaise: 0, label: "Free boost", tagline: "60s ad · 10 min free" },
 ];

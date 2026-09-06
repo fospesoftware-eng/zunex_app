@@ -2,11 +2,26 @@
   "name": "ZUNEX Charging",
   "short_name": "ZUNEX",
   "description": "Premium charging experience by ZUNEX",
+  "id": "/",
   "start_url": "/",
-  "display": "standalone",
+  "scope": "/",
+  "display": "fullscreen",
+  "display_override": ["fullscreen", "standalone", "minimal-ui"],
+  "orientation": "portrait",
   "background_color": "#04050a",
   "theme_color": "#04050a",
   "icons": [
-    { "src": "/brand/zunex-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+    {
+      "src": "/brand/zunex-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/brand/zunex-icon-maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
   ]
 }
