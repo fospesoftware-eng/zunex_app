@@ -27,6 +27,8 @@ const ease = [0.22, 1, 0.36, 1] as const;
 const APP_LOGOS: Partial<Record<UpiAppTarget["id"], string>> = {
   phonepe: "/brand/logo-phonepe.svg",
   gpay: "/brand/logo-gpay.svg",
+  upi: "/brand/logo-upi.svg",
+  card: "/brand/logo-card.svg",
 };
 
 const LABELS: Record<UpiAppTarget["id"], string> = {

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Generic Card payment icon — matches PhonePe / GPay 64×64 rounded-rect style -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <rect width="64" height="64" rx="14.5" fill="#141830" stroke="rgba(255,255,255,0.14)" stroke-width="1" />
+  <rect
+    x="11"
+    y="19"
+    width="42"
+    height="26"
+    rx="4"
+    fill="none"
+    stroke="rgba(255,255,255,0.85)"
+    stroke-width="1.8"
+  />
+  <rect x="11" y="26" width="42" height="7" fill="rgba(255,255,255,0.85)" />
+  <rect x="18" y="37" width="12" height="3" rx="1.5" fill="rgba(255,255,255,0.55)" />
+  <rect x="35" y="37" width="8" height="3" rx="1.5" fill="rgba(255,255,255,0.35)" />
+</svg>

@@ -5,7 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import type { ConnectionQuality } from "@/lib/client/useSessionSync";
 import type { SessionSnapshot } from "@/lib/core/types";
 import { formatCountdown } from "@/lib/core/format";
-import { BrandHeader, BrandSymbol } from "@/components/brand/Logo";
+import { BrandHeader } from "@/components/brand/Logo";
 import EnergyRing from "@/components/visuals/EnergyRing";
 import InstallPrompt from "@/components/visuals/InstallPrompt";
 

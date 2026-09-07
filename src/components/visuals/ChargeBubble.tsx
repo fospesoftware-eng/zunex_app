@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
-import { BrandSymbol } from "@/components/brand/Logo";
 
 // ---------------------------------------------------------------------------
 // ChargeBubble — the tap-to-charge hero. A floating glass sphere holding the
