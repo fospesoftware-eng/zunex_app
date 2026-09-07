@@ -264,38 +264,13 @@ export default function WiFiScreen({ onDone }: { onDone: () => void }) {
                 </div>
                 <h1 className="flow-title font-display">ZUNEX WiFi</h1>
                 <p className="flow-sub">
-                  Pick how you want to connect — free with a short ad, or grab a
-                  data pack for faster browsing.
+                  Pick a data pack to unlock high-speed internet, or grab free
+                  WiFi with a short ad.
                 </p>
               </div>
 
-              {/* Free WiFi (ad-sponsored) */}
-              <motion.button
-                type="button"
-                className="offer-card mb-3"
-                onClick={() => setStep("phone")}
-                initial={{ opacity: 0, y: 18 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.55, delay: 0.1, ease }}
-                whileTap={{ scale: 0.975 }}
-              >
-                <span className="offer-ad font-display">
-                  <Icon name="timer" size={14} />
-                  {AD_SECONDS}s ad
-                </span>
-                <span className="offer-mins font-display">
-                  Free
-                  <em> WiFi</em>
-                </span>
-                <span className="offer-blurb">Unlimited data for this session</span>
-                <span className="offer-cta font-display">
-                  Watch ad
-                  <Icon name="chevron-left" size={13} className="rotate-180" />
-                </span>
-              </motion.button>
-
-              {/* Paid data plans — underneath the ad option */}
-              <div className="flex flex-col gap-3 mt-1">
+              {/* Paid data plans — top */}
+              <div className="flex flex-col gap-3 mb-3">
                 {WIFI_PAID_PLANS.map((plan, i) => (
                   <motion.button
                     key={plan.id}
@@ -304,7 +279,7 @@ export default function WiFiScreen({ onDone }: { onDone: () => void }) {
                     onClick={() => startPaidPlan(plan)}
                     initial={{ opacity: 0, y: 18 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.55, delay: 0.2 + i * 0.09, ease }}
+                    transition={{ duration: 0.55, delay: 0.1 + i * 0.09, ease }}
                     whileTap={{ scale: 0.975 }}
                   >
                     <span className="offer-ad font-display">
@@ -323,6 +298,31 @@ export default function WiFiScreen({ onDone }: { onDone: () => void }) {
                   </motion.button>
                 ))}
               </div>
+
+              {/* Free WiFi (ad-sponsored) — last */}
+              <motion.button
+                type="button"
+                className="offer-card"
+                onClick={() => setStep("phone")}
+                initial={{ opacity: 0, y: 18 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.55, delay: 0.3, ease }}
+                whileTap={{ scale: 0.975 }}
+              >
+                <span className="offer-ad font-display">
+                  <Icon name="timer" size={14} />
+                  {AD_SECONDS}s ad
+                </span>
+                <span className="offer-mins font-display">
+                  Free
+                  <em> WiFi</em>
+                </span>
+                <span className="offer-blurb">Unlimited data for this session</span>
+                <span className="offer-cta font-display">
+                  Watch ad
+                  <Icon name="chevron-left" size={13} className="rotate-180" />
+                </span>
+              </motion.button>
             </motion.section>
           )}
 
