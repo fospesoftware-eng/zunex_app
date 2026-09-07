@@ -262,7 +262,6 @@ export default function WiFiScreen({ onDone }: { onDone: () => void }) {
                     />
                   </span>
                 </div>
-                <h1 className="flow-title font-display">ZUNEX WiFi</h1>
                 <p className="flow-sub">
                   Pick a data pack to unlock high-speed internet, or grab free
                   WiFi with a short ad.
