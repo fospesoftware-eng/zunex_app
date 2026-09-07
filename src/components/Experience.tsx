@@ -9,6 +9,7 @@ import { useSessionSync } from "@/lib/client/useSessionSync";
 import { useCountdown } from "@/lib/client/useServerCountdown";
 import { useWakeLock } from "@/lib/client/useWakeLock";
 import { playComplete, playStart } from "@/lib/client/sound";
+import InstallPrompt from "@/components/visuals/InstallPrompt";
 import { BrandHeader } from "@/components/brand/Logo";
 import EnergyOrb from "@/components/visuals/EnergyOrb";
 import WelcomeScreen from "@/components/screens/WelcomeScreen";
@@ -354,6 +355,7 @@ export default function Experience({ stationId }: { stationId?: string }) {
 
   // ---- Render ------------------------------------------------------------------
   return (
+    <>
     <AnimatePresence mode="wait">
       <motion.div
         key={
@@ -432,5 +434,15 @@ export default function Experience({ stationId }: { stationId?: string }) {
         )}
       </motion.div>
     </AnimatePresence>
+
+    {/* Install nudge — mounted outside AnimatePresence so it persists
+        across activation → charging transitions. Shows on ANY charging
+        session regardless of duration (15min, 30min, 60min, free5, free10)
+        12s after the activation screen appears. Never shows inside an
+        installed PWA. */}
+    {(screen === "activation" || screen === "charging") && (
+      <InstallPrompt delayMs={12000} />
+    )}
+    </>
   );
 }
