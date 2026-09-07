@@ -9,7 +9,7 @@
    Bumping CACHE purges every older cache on activation.
 */
 
-const CACHE = "zunex-shell-v6";
+const CACHE = "zunex-shell-v7";
 const CORE = [
   "/manifest.webmanifest",
   "/brand/icon-192.png",

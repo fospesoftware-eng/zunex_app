@@ -64,6 +64,7 @@ export default function InstallPrompt({ delayMs = 15000 }: { delayMs?: number })
   const [visible, setVisible] = useState(false);
   const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null);
   const [ios] = useState(isIos);
+  const [showIosSheet, setShowIosSheet] = useState(false);
 
   useEffect(() => {
     // Already installed as an app — never nag.
@@ -104,8 +105,10 @@ export default function InstallPrompt({ delayMs = 15000 }: { delayMs?: number })
       deferredPrompt = null;
       setDeferred(null);
     } else if (ios) {
-      // iOS Safari has no beforeinstallprompt — but navigator.share() opens
-      // the native share sheet, which is where "Add to Home Screen" lives.
+      // iOS Safari has no beforeinstallprompt. Try navigator.share() to
+      // open the native share sheet (where "Add to Home Screen" lives).
+      // If that fails or isn't available, show a visual instruction sheet
+      // pointing the user to the Safari share button.
       try {
         if (navigator.share) {
           await navigator.share({
@@ -115,13 +118,13 @@ export default function InstallPrompt({ delayMs = 15000 }: { delayMs?: number })
           });
           setVisible(false);
         } else {
-          // Older iOS without Web Share API — just dismiss after the user
-          // has seen the hint text.
-          dismiss();
+          setShowIosSheet(true);
         }
       } catch {
-        // User cancelled the share sheet — keep the banner visible, they
-        // may change their mind.
+        // User cancelled the share sheet, or share() threw — show the
+        // visual instruction sheet as a fallback so they still know what
+        // to do.
+        setShowIosSheet(true);
       }
     } else {
       // No native event and not iOS — browser is unsupported.
@@ -130,64 +133,116 @@ export default function InstallPrompt({ delayMs = 15000 }: { delayMs?: number })
   };
 
   const handleBannerTap = (e: React.MouseEvent) => {
-    // Don't trigger install when clicking the close button or the Install
-    // button itself — they have their own handlers.
     const target = e.target as HTMLElement;
     if (target.closest(".install-close") || target.closest(".install-btn")) return;
-    // Only make the banner body clickable when there's no deferred prompt
-    // (iOS path, or unsupported browsers). On Android with deferred, the
-    // Install button is the right call — banner tap would be ambiguous.
     if (!deferred) void install();
   };
 
   return (
-    <AnimatePresence>
-      {visible && (
-        <motion.div
-          className="install-banner"
-          onClick={handleBannerTap}
-          initial={{ y: "-110%", opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          exit={{ y: "-110%", opacity: 0 }}
-          transition={{ type: "spring", stiffness: 260, damping: 28 }}
-          role="dialog"
-          aria-label="Install the ZUNEX app"
-          style={!deferred ? { cursor: "pointer" } : undefined}
-        >
-          <div className="install-icon" aria-hidden="true">
-            <Icon name="download" size={18} />
-          </div>
-
-          <div className="install-copy">
-            <p className="install-title font-display">Install ZUNEX</p>
-            {ios ? (
-              <p className="install-hint">
-                Tap <Icon name="share" size={12} className="inline align-text-bottom" /> Share
-                then “Add to Home Screen”
-              </p>
-            ) : deferred ? (
-              <p className="install-hint">Add to home screen for one-tap charging</p>
-            ) : (
-              <p className="install-hint">Use your browser menu → Add to Home screen</p>
-            )}
-          </div>
-
-          {(deferred || ios) && (
-            <button type="button" className="install-btn font-display" onClick={install}>
-              Install
-            </button>
-          )}
-
-          <button
-            type="button"
-            className="install-close"
-            aria-label="Dismiss"
-            onClick={dismiss}
+    <>
+      <AnimatePresence>
+        {visible && (
+          <motion.div
+            className="install-banner"
+            onClick={handleBannerTap}
+            initial={{ y: "-110%", opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: "-110%", opacity: 0 }}
+            transition={{ type: "spring", stiffness: 260, damping: 28 }}
+            role="dialog"
+            aria-label="Install the ZUNEX app"
+            style={!deferred ? { cursor: "pointer" } : undefined}
           >
-            <Icon name="close" size={14} />
-          </button>
-        </motion.div>
-      )}
-    </AnimatePresence>
+            <div className="install-icon" aria-hidden="true">
+              <Icon name="download" size={18} />
+            </div>
+
+            <div className="install-copy">
+              <p className="install-title font-display">Install ZUNEX</p>
+              {ios ? (
+                <p className="install-hint">
+                  Tap Install, then Share &rarr; Add to Home Screen
+                </p>
+              ) : deferred ? (
+                <p className="install-hint">Add to home screen for one-tap charging</p>
+              ) : (
+                <p className="install-hint">Use your browser menu &rarr; Add to Home screen</p>
+              )}
+            </div>
+
+            {(deferred || ios) && (
+              <button type="button" className="install-btn font-display" onClick={install}>
+                Install
+              </button>
+            )}
+
+            <button
+              type="button"
+              className="install-close"
+              aria-label="Dismiss"
+              onClick={dismiss}
+            >
+              <Icon name="close" size={14} />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* iOS instruction sheet — shown when navigator.share() is unavailable
+          or was cancelled. Gives the user clear, tappable visual steps. */}
+      <AnimatePresence>
+        {showIosSheet && (
+          <motion.div
+            className="ios-install-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setShowIosSheet(false)}
+          >
+            <motion.div
+              className="ios-install-card"
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 20 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                className="ios-sheet-close"
+                aria-label="Close"
+                onClick={() => setShowIosSheet(false)}
+              >
+                <Icon name="close" size={16} />
+              </button>
+              <div className="ios-sheet-icon" aria-hidden="true">
+                <Icon name="download" size={28} />
+              </div>
+              <p className="ios-sheet-title font-display">Add to Home Screen</p>
+              <ol className="ios-sheet-steps">
+                <li>
+                  Tap the <strong>Share</strong> button
+                  <Icon name="share" size={14} className="inline mx-1 align-text-bottom" />
+                  in Safari&apos;s toolbar
+                </li>
+                <li>
+                  Scroll down and tap <strong>&ldquo;Add to Home Screen&rdquo;</strong>
+                </li>
+                <li>
+                  Tap <strong>Add</strong> &mdash; ZUNEX appears on your home screen
+                </li>
+              </ol>
+              <button
+                className="ios-sheet-done font-display"
+                onClick={() => {
+                  setShowIosSheet(false);
+                  setVisible(false);
+                }}
+              >
+                Got it
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
   );
 }
