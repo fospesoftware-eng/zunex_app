@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import type { SessionSnapshot } from "@/lib/core/types";
-import { formatClock } from "@/lib/core/format";
+import { formatClock, formatPlanMinutes } from "@/lib/core/format";
 import { BrandHeader } from "@/components/brand/Logo";
 import ChargeSeal from "@/components/visuals/ChargeSeal";
 import { GlowButton } from "@/components/ui/kit";
@@ -27,6 +27,12 @@ export default function CompleteScreen({
   const watts = snapshot.charging?.watts ?? 30;
   const energyWh = plan ? Math.round(((watts * plan.minutes) / 60) * 10) / 10 : 0;
   const endedAt = snapshot.completedAt ?? Date.now();
+  const dur = plan ? formatPlanMinutes(plan.minutes) : null;
+  const durationLabel = dur
+    ? dur.unit === "SEC"
+      ? `${dur.value} seconds`
+      : `${dur.value} minutes`
+    : "—";
 
   return (
     <div className="app-viewport safe-x safe-top safe-bottom overflow-hidden">
@@ -62,7 +68,7 @@ export default function CompleteScreen({
         >
           {[
             ["Station", stationName ?? "Zunex"],
-            ["Duration", plan ? `${plan.minutes} minutes` : "—"],
+            ["Duration", durationLabel],
             ["Energy delivered", `${energyWh} Wh`],
             ["Average power", `${watts} W`],
             ["Ended at", formatClock(endedAt)],

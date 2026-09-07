@@ -25,3 +25,13 @@ export function formatDuration(ms: number): string {
   const m = mins % 60;
   return m === 0 ? `${h} hr` : `${h} hr ${m} min`;
 }
+
+/**
+ * Format a plan's minute value for the duration picker. Sub-minute plans
+ * (e.g. 0.5 = 30s) render as "30 SEC"; whole minutes render as "15".
+ */
+export function formatPlanMinutes(minutes: number): { value: string; unit: string } {
+  const totalSec = Math.round(minutes * 60);
+  if (totalSec < 60) return { value: String(totalSec), unit: "SEC" };
+  return { value: String(Math.round(minutes)), unit: "MIN" };
+}

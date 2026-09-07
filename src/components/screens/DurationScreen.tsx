@@ -9,7 +9,7 @@ import type {
   Station,
   UpiAppTarget,
 } from "@/lib/core/types";
-import { formatINR } from "@/lib/core/format";
+import { formatINR, formatPlanMinutes } from "@/lib/core/format";
 import { api } from "@/lib/client/api";
 import { useDemoStore } from "@/lib/client/demoStore";
 import { BrandHeader } from "@/components/brand/Logo";
@@ -302,12 +302,19 @@ export default function DurationScreen({
                 }
               >
                 <div className="flex items-center justify-between gap-4">
-                  <div className="flex items-baseline gap-1.5">
-                    <span className="numeral text-[2.1rem] font-semibold leading-none">
-                      {plan.minutes}
-                    </span>
-                    <span className="eyebrow !text-[0.5625rem] !tracking-[0.22em]">MIN</span>
-                  </div>
+                    <div className="flex items-baseline gap-1.5">
+                      {(() => {
+                        const dur = formatPlanMinutes(plan.minutes);
+                        return (
+                          <>
+                            <span className="numeral text-[2.1rem] font-semibold leading-none">
+                              {dur.value}
+                            </span>
+                            <span className="eyebrow !text-[0.5625rem] !tracking-[0.22em]">{dur.unit}</span>
+                          </>
+                        );
+                      })()}
+                    </div>
                   <div className="text-right flex-1">
                     <p className="numeral text-xl font-medium">{formatINR(plan.pricePaise)}</p>
                     <p className="text-paper-dim text-xs mt-0.5">{plan.tagline}</p>

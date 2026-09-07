@@ -6,6 +6,7 @@ import { Icon, Sheet, GhostButton } from "@/components/ui/kit";
 import { BrandWordmark } from "@/components/brand/Logo";
 import AdPlayer from "@/components/visuals/AdPlayer";
 import { useDemoStore } from "@/lib/client/demoStore";
+import { formatPlanMinutes } from "@/lib/core/format";
 
 // ---------------------------------------------------------------------------
 // FreeChargeScreen — watch an ad, charge free. The phone must already be
@@ -20,6 +21,7 @@ const OFFERS: {
   minutes: number;
   blurb: string;
 }[] = [
+  { planId: "freetrial", adSeconds: 10, minutes: 0.5, blurb: "A 30-second taste" },
   { planId: "free5", adSeconds: 30, minutes: 5, blurb: "Quick splash of energy" },
   { planId: "free10", adSeconds: 60, minutes: 10, blurb: "A proper breather" },
 ];
@@ -135,8 +137,8 @@ export default function FreeChargeScreen({
                       {offer.adSeconds}s ad
                     </span>
                     <span className="offer-mins font-display">
-                      {offer.minutes}
-                      <em> min</em>
+                      {formatPlanMinutes(offer.minutes).value}
+                      <em> {offer.minutes < 1 ? "sec" : "min"}</em>
                     </span>
                     <span className="offer-blurb">{offer.blurb}</span>
                     <span className="offer-cta font-display">
@@ -162,7 +164,7 @@ export default function FreeChargeScreen({
             >
               <AdPlayer
                 seconds={watching.adSeconds}
-                perk={`${watching.adSeconds}s ad · ${watching.minutes} min free`}
+                perk={`${watching.adSeconds}s ad · ${formatPlanMinutes(watching.minutes).value} ${watching.minutes < 1 ? "sec" : "min"} free`}
                 onComplete={(skipped) =>
                   skipped ? onSkip() : onSelect(watching.planId)
                 }
