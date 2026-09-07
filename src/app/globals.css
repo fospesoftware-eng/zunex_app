@@ -1588,6 +1588,7 @@ button {
 .offer-card {
   position: relative;
   display: grid;
+  width: 100%;
   grid-template-columns: 1fr auto;
   grid-template-areas:
     "ad mins"
