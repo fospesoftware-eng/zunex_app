@@ -119,7 +119,7 @@ export default function ChargingScreen({
         </motion.div>
       </main>
 
-      {/* Footer — small breathing ZUNEX mark in a liquid-glass disc */}
+      {/* Footer — a minimal, breathing ZUNEX mark */}
       <motion.footer
         className="charge-foot"
         initial={{ opacity: 0, y: 16 }}
@@ -127,9 +127,7 @@ export default function ChargingScreen({
         transition={{ duration: 0.7, delay: 0.45, ease }}
         aria-hidden="true"
       >
-        <div className="charge-foot-disc">
-          <span className="charge-foot-mark" />
-        </div>
+        <span className="charge-foot-mark" />
       </motion.footer>
 
       {/* Install nudge — only while actively charging, 15s after the
