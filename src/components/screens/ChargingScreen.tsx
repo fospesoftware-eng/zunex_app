@@ -7,6 +7,7 @@ import type { SessionSnapshot } from "@/lib/core/types";
 import { formatCountdown } from "@/lib/core/format";
 import { BrandHeader, BrandSymbol } from "@/components/brand/Logo";
 import EnergyRing from "@/components/visuals/EnergyRing";
+import InstallPrompt from "@/components/visuals/InstallPrompt";
 
 // ---------------------------------------------------------------------------
 // ChargingScreen — the hero. A glass energy torus with a server-anchored
@@ -117,6 +118,10 @@ export default function ChargingScreen({
           ))}
         </motion.div>
       </main>
+
+      {/* Install nudge — only while actively charging, 15s after the
+          charge timer starts (and never inside an installed PWA). */}
+      {snapshot.state === "charging_active" && <InstallPrompt delayMs={15000} />}
     </div>
   );
 }

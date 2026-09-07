@@ -5,7 +5,6 @@ import Backdrop from "@/components/visuals/Backdrop";
 import DeviceGate from "@/components/screens/DeviceGate";
 import Experience from "@/components/Experience";
 import DemoPanel from "@/components/DemoPanel";
-import InstallPrompt from "@/components/visuals/InstallPrompt";
 import { useDemoStore } from "@/lib/client/demoStore";
 
 // ---------------------------------------------------------------------------
@@ -94,7 +93,6 @@ export default function App({
           <Experience stationId={stationId} />
         </DeviceGate>
       </div>
-      <InstallPrompt />
       <DemoPanel />
     </ErrorBoundary>
   );
