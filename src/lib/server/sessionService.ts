@@ -75,6 +75,22 @@ function tick(s: SessionRecord): void {
     return;
   }
 
+  // Hardware never confirmed a start (or the client died during "starting") →
+  // release the port instead of leaving it busy forever.
+  if (s.state === "starting" && now - s.updatedAt > 90_000) {
+    transition(s, ["starting"], "error", {
+      errorCode: "hardware_unreachable",
+      startRequested: false,
+    });
+    return;
+  }
+
+  // "stopping" that never got an ack back → settle it so the port frees.
+  if (s.state === "stopping" && now - s.updatedAt > 60_000) {
+    transition(s, ["stopping"], "charging_completed", { completedAt: now });
+    return;
+  }
+
   if (s.state === "charging_active" && s.endsAt !== null && now >= s.endsAt && !s.stopRequested) {
     s.stopRequested = true;
     transition(s, ["charging_active"], "stopping");
@@ -137,6 +153,18 @@ function toSnapshot(s: SessionRecord): SessionSnapshot {
 export const sessionService = {
   getById(sessionId: string): SessionRecord | null {
     return store.sessions.get(sessionId) ?? null;
+  },
+
+  /**
+   * Advance the lifecycle of EVERY session. Normally a session is ticked when
+   * its own client polls it; but when the client goes away mid-charge (page
+   * closed, store cleared, abandoned), nobody polls it and the port can read
+   * as "busy" forever. Calling reap before station-status lookups finalizes
+   * finished/stuck charges so the station self-heals without a restart.
+   */
+  reap(): void {
+    maybeSweep();
+    for (const s of store.sessions.values()) tick(s);
   },
 
   createSession(input: {

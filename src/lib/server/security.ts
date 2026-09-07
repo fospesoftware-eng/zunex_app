@@ -6,22 +6,36 @@ import type { NextRequest } from "next/server";
 // ---------------------------------------------------------------------------
 
 /**
- * Demo endpoints let the demo panel force payment outcomes and fast-forward
- * charging. They must NOT be reachable in production with just a spoofable
- * header. In production we require a shared secret (`ZUNEX_DEMO_TOKEN`) that
- * the panel also sends; in development the header alone is enough.
+ * Demo endpoints let the demo panel force payment outcomes, fast-forward
+ * charging and abort sessions. This deployment is a DEMO build — the payment
+ * provider and hardware are both mocks (no real money, no real device), so
+ * the demo is reachable in production when the client is in demo mode (it
+ * sends the `x-zunex-demo` header; normal users never do) and requests stay
+ * rate-limited.
+ *
+ * Hardening options (all optional):
+ *  - set ZUNEX_DEMO_TOKEN  → demo requires the matching `x-zunex-demo-token`
+ *  - set ZUNEX_DEMO_ENABLED=0 → demo disabled entirely in production
  */
-export function isDemoAuthorized(req: NextRequest): boolean {
-  if (process.env.NODE_ENV !== "production") return true;
+function productionDemoAllowed(req: NextRequest): boolean {
+  if (process.env.ZUNEX_DEMO_ENABLED === "0") return false;
   const token = process.env.ZUNEX_DEMO_TOKEN;
-  if (!token) return false; // no token configured → demo fully disabled in prod
+  if (!token) return true; // demo build, no operator lock configured → allow
   const provided = req.headers.get("x-zunex-demo-token");
-  if (!provided) return false;
-  // constant-time-ish comparison
-  if (provided.length !== token.length) return false;
+  if (!provided || provided.length !== token.length) return false;
   let mismatch = 0;
   for (let i = 0; i < token.length; i++) mismatch |= provided.charCodeAt(i) ^ token.charCodeAt(i);
   return mismatch === 0;
+}
+
+export function isDemoAuthorized(req: NextRequest): boolean {
+  if (process.env.NODE_ENV !== "production") return true;
+  return productionDemoAllowed(req);
+}
+
+/** Shared token check for the scenario header path. */
+export function demoAllowed(req: NextRequest): boolean {
+  return isDemoAuthorized(req);
 }
 
 /**

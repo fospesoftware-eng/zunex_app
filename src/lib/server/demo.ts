@@ -1,11 +1,14 @@
 import type { DemoScenario } from "@/lib/core/types";
 import type { NextRequest } from "next/server";
+import { isDemoAuthorized } from "@/lib/server/security";
 
 // ---------------------------------------------------------------------------
 // Demo scenarios ride in on every request via a header set by the client
-// (persisted in localStorage). Production simply never sends the header.
-// In production, non-default scenarios also require the demo token so an
-// attacker can't force failures (station offline, payment failed, etc.).
+// (persisted in localStorage). Production never sends the header for normal
+// users; the demo panel sends it. This is a demo build (mock payments + mock
+// hardware), so non-default scenarios are honored when demo is authorized —
+// in production that means the header is present and, IF ZUNEX_DEMO_TOKEN is
+// configured, the token matches (set ZUNEX_DEMO_ENABLED=0 to force-disable).
 // ---------------------------------------------------------------------------
 
 const SCENARIOS: DemoScenario[] = [
@@ -17,23 +20,12 @@ const SCENARIOS: DemoScenario[] = [
   "network_complete",
 ];
 
-function hasDemoToken(req: NextRequest): boolean {
-  const token = process.env.ZUNEX_DEMO_TOKEN;
-  if (!token) return false;
-  const provided = req.headers.get("x-zunex-demo-token");
-  if (!provided || provided.length !== token.length) return false;
-  let mismatch = 0;
-  for (let i = 0; i < token.length; i++) mismatch |= provided.charCodeAt(i) ^ token.charCodeAt(i);
-  return mismatch === 0;
-}
-
 export function scenarioFromRequest(req: NextRequest): DemoScenario {
   const raw = req.headers.get("x-zunex-demo") ?? "default";
   const scenario = (SCENARIOS as string[]).includes(raw) ? (raw as DemoScenario) : "default";
-  // In production, only honor non-default scenarios when the demo token is
-  // present. This prevents an attacker from forcing station_offline /
-  // payment_failed / start_failed on arbitrary requests.
-  if (process.env.NODE_ENV === "production" && scenario !== "default" && !hasDemoToken(req)) {
+  // In production, only honor non-default scenarios when demo is authorized
+  // (token matches if configured; otherwise the demo-build default allows it).
+  if (process.env.NODE_ENV === "production" && scenario !== "default" && !isDemoAuthorized(req)) {
     return "default";
   }
   return scenario;

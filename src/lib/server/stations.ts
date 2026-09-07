@@ -1,5 +1,6 @@
 import type { Station, StationStatus } from "@/lib/core/types";
 import { PLANS, store, type SessionRecord } from "@/lib/server/store";
+import { sessionService } from "@/lib/server/sessionService";
 
 // ---------------------------------------------------------------------------
 // Station registry. In production this becomes a DB/API backed adapter.
@@ -64,6 +65,9 @@ export function getStation(
 ): { station: Station } | { error: "not_found" } {
   const config = STATION_CONFIGS.find((s) => s.id === stationId.toUpperCase());
   if (!config) return { error: "not_found" };
+  // Finalize any finished/abandoned sessions before reporting occupancy so a
+  // charge whose client went away frees the port without a server restart.
+  sessionService.reap();
   const status = computeStatus(config, scenario);
   const station: Station = {
     id: config.id,
@@ -78,6 +82,7 @@ export function getStation(
 }
 
 export function hasActiveSessionForStation(stationId: string): boolean {
+  sessionService.reap();
   for (const session of store.sessions.values()) {
     if (session.stationId === stationId && ACTIVE_STATES.has(session.state)) return true;
   }
