@@ -41,6 +41,14 @@ const STATION_CONFIGS: StationConfig[] = [
     connector: "USB-C",
     baseStatus: "available",
   },
+  {
+    id: "ZNX-TEST",
+    name: "ZUNEX Test Lab",
+    location: "Test Station · QA Lab",
+    powerWatts: 30,
+    connector: "USB-C",
+    baseStatus: "available",
+  },
 ];
 
 const ACTIVE_STATES = new Set([
