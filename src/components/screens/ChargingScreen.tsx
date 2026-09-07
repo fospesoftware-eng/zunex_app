@@ -96,7 +96,7 @@ export default function ChargingScreen({
           <EnergyRing progress={progress} countdown={countdown} settled={stopping} />
         </motion.div>
 
-        {/* Telemetry — a full-bleed instrument readout, no boxes */}
+        {/* Telemetry — a floating liquid-glass instrument capsule */}
         <motion.div
           className="telemetry-strip w-full"
           initial={{ opacity: 0, y: 24 }}
@@ -118,6 +118,19 @@ export default function ChargingScreen({
           ))}
         </motion.div>
       </main>
+
+      {/* Footer — small breathing ZUNEX mark in a liquid-glass disc */}
+      <motion.footer
+        className="charge-foot"
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.7, delay: 0.45, ease }}
+        aria-hidden="true"
+      >
+        <div className="charge-foot-disc">
+          <span className="charge-foot-mark" />
+        </div>
+      </motion.footer>
 
       {/* Install nudge — only while actively charging, 15s after the
           charge timer starts (and never inside an installed PWA). */}
