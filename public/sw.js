@@ -1,13 +1,16 @@
-/* ZUNEX service worker — app-shell caching for installability + offline shell.
+/* ZUNEX service worker — minimal, staleness-proof app shell.
    Strategy:
-   - Navigations: network-first, cached shell fallback when offline.
-   - Static assets (/_next/static, /brand): cache-first with background fill.
+   - Page navigations: NEVER intercepted → always fresh HTML from network.
+     (A stale HTML shell referencing old chunk hashes was causing stuck/
+      outdated bundles; the app needs its API anyway, so no offline shell.)
+   - /_next/static/*: cache-first (content-hashed, immutable).
+   - /brand/*: stale-while-revalidate (serve fast, refresh in background).
    - API / SSE / non-GET: never touched.
+   Bumping CACHE purges every older cache on activation.
 */
 
-const CACHE = "zunex-shell-v5";
+const CACHE = "zunex-shell-v6";
 const CORE = [
-  "/",
   "/manifest.webmanifest",
   "/brand/icon-192.png",
   "/brand/icon-512.png",
@@ -45,8 +48,8 @@ self.addEventListener("fetch", (event) => {
   if (url.origin !== self.location.origin) return;
   if (url.pathname.startsWith("/api/")) return;
 
-  // Static, immutable content — cache first, fill cache on miss.
-  if (url.pathname.startsWith("/_next/static/") || url.pathname.startsWith("/brand/")) {
+  // Immutable, content-hashed build output — cache first, fill on miss.
+  if (url.pathname.startsWith("/_next/static/")) {
     event.respondWith(
       caches.match(req).then(
         (hit) =>
@@ -68,21 +71,29 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Page navigations — network first; fall back to cached shell when offline.
-  if (req.mode === "navigate") {
+  // Brand assets (not hashed) — stale-while-revalidate so icon/logo updates
+  // reach installed clients without waiting for a cache version bump.
+  if (url.pathname.startsWith("/brand/")) {
     event.respondWith(
-      fetch(req)
-        .then((res) => {
-          if (res.ok) {
-            const copy = res.clone();
-            caches
-              .open(CACHE)
-              .then((c) => c.put("/", copy))
-              .catch(() => {});
-          }
-          return res;
-        })
-        .catch(() => caches.match("/").then((shell) => shell || caches.match(req)))
+      caches.match(req).then((hit) => {
+        const refresh = fetch(req)
+          .then((res) => {
+            if (res.ok) {
+              const copy = res.clone();
+              caches
+                .open(CACHE)
+                .then((c) => c.put(req, copy))
+                .catch(() => {});
+            }
+            return res;
+          })
+          .catch(() => hit);
+        return hit || refresh;
+      })
     );
+    return;
   }
+
+  // Everything else (page navigations, sw.js itself, manifest edge cases):
+  // plain network — never serve a cached page.
 });

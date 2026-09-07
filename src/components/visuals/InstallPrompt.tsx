@@ -10,11 +10,11 @@ import { Icon } from "@/components/ui/kit";
 // charging screen and appears `delayMs` after the charge timer starts.
 // Android/Chrome gets the native beforeinstallprompt flow; iOS Safari gets
 // manual share-sheet steps. Never shows when already running standalone
-// (installed); dismissal is remembered for a few days so it doesn't nag.
+// (installed); dismissal is remembered for the current browsing session only,
+// so every new visit gets the nudge again within 15s of charging.
 // ---------------------------------------------------------------------------
 
-const DISMISS_KEY = "zunex:install-dismissed-at";
-const DISMISS_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+const DISMISS_KEY = "zunex:install-dismissed";
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -52,8 +52,9 @@ function isIos(): boolean {
 
 function recentlyDismissed(): boolean {
   try {
-    const at = Number(localStorage.getItem(DISMISS_KEY) ?? "0");
-    return Boolean(at) && Date.now() - at < DISMISS_COOLDOWN_MS;
+    // Session-scoped: dismissed for this tab session only, so a new visit
+    // (or reload) gets the banner again. Never blocks future sessions.
+    return sessionStorage.getItem(DISMISS_KEY) === "1";
   } catch {
     return false;
   }
@@ -83,7 +84,7 @@ export default function InstallPrompt({ delayMs = 15000 }: { delayMs?: number })
 
   const dismiss = () => {
     try {
-      localStorage.setItem(DISMISS_KEY, String(Date.now()));
+      sessionStorage.setItem(DISMISS_KEY, "1");
     } catch {
       /* ignore */
     }
