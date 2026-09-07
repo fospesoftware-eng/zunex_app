@@ -46,9 +46,9 @@ export const viewport: Viewport = {
   userScalable: false,
   viewportFit: "cover",
   themeColor: [
-    { media: "(display-mode: fullscreen)", color: "#04050a" },
-    { media: "(display-mode: standalone)", color: "#04050a" },
-    { media: "all", color: "#04050a" },
+    { media: "(display-mode: fullscreen)", color: "#0b1024" },
+    { media: "(display-mode: standalone)", color: "#0b1024" },
+    { media: "all", color: "#0b1024" },
   ],
 };
 

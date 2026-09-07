@@ -149,7 +149,7 @@ export function Sheet({
             exit={{ y: "110%" }}
             transition={{ type: "spring", stiffness: 320, damping: 34 }}
           >
-            <div className="glass rounded-[1.75rem] p-5 max-w-md mx-auto hairline-top">
+            <div className="glass rounded-[1.75rem] p-5 max-w-md mx-auto hairline-top max-h-[calc(100dvh-28px)] overflow-y-auto no-scrollbar">
               <div className="w-10 h-1 rounded-full bg-white/15 mx-auto mb-4" />
               {children}
             </div>

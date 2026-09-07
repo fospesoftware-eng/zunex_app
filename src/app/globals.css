@@ -43,8 +43,13 @@ body {
 }
 
 html {
-  /* Fullscreen PWA / edge-to-edge: never let a browser bar eat the layout */
-  background: var(--color-ink-950);
+  /* Navy behind the status bar / notch cutout — matches the scene's top so
+     no black band ever shows (Android paints this area from theme_color). */
+  background: #0b1024;
+  /* Hard-lock the page to one screen: no scroll or rubber-band pan on any axis. */
+  overflow: hidden;
+  overscroll-behavior: none;
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
@@ -53,16 +58,13 @@ body {
   font-family: var(--font-inter), system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  overscroll-behavior-y: none;
   text-rendering: optimizeLegibility;
-}
-
-/* When installed (standalone/fullscreen), lock overscroll so the experience
-   feels native. The app is viewport-locked by design (100dvh + safe areas). */
-@media (display-mode: standalone), (display-mode: fullscreen) {
-  body {
-    overscroll-behavior: none;
-  }
+  width: 100%;
+  max-width: 100%;
+  height: 100dvh;
+  overflow: hidden;
+  overscroll-behavior: none;
+  touch-action: manipulation;
 }
 
 ::selection {
@@ -1193,10 +1195,12 @@ button {
 
 .app-viewport {
   position: relative;
-  min-height: 100vh;
-  min-height: 100dvh;
+  height: 100vh;
+  height: 100dvh;
+  max-height: 100dvh;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .safe-x {
@@ -1227,15 +1231,21 @@ button {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  gap: 6px;
+  width: 100%;
+  flex-wrap: nowrap;
+  overflow: hidden;
   padding-bottom: max(var(--safe-bottom), 6px);
 }
 
 .quick-action {
+  flex: 0 1 auto;
+  min-width: 0;
+  white-space: nowrap;
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  padding: 10px 18px;
+  padding: 10px clamp(12px, 4vw, 18px);
   border-radius: 999px;
   font-family: var(--font-space), var(--font-inter), system-ui, sans-serif;
   font-size: 0.75rem;
@@ -1263,6 +1273,7 @@ button {
 
 /* Icon-only quick action (scan) — a small circular glass button */
 .quick-action-icon {
+  flex: 0 0 auto;
   padding: 0;
   width: 40px;
   height: 40px;
