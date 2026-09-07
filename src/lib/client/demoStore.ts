@@ -22,6 +22,49 @@ const SCENARIOS: { id: DemoScenario; label: string; hint: string }[] = [
 ];
 
 const LS_KEY = "zunex:demo-scenario";
+const SESSION_KEY_PREFIX = "zunex:session";
+
+/**
+ * Tear down every live session before a demo run so a real/previous charge
+ * never lingers and holds the station "busy". We:
+ *  1. gather every stored session id (zunex:session[:station]),
+ *  2. ask the server to abort it (force-cancel, stop hardware) via the
+ *     demo abort endpoint — keepalive so it survives the imminent reload,
+ *  3. remove the local restore keys so the app boots at the welcome screen.
+ */
+function abortAllLiveSessions() {
+  const { enabled, scenario } = useDemoStore.getState();
+  const ids = new Set<string>();
+  try {
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(SESSION_KEY_PREFIX)) {
+        const v = localStorage.getItem(key);
+        if (v) ids.add(v);
+        localStorage.removeItem(key);
+      }
+    }
+  } catch {
+    /* storage unavailable */
+  }
+
+  for (const id of ids) {
+    try {
+      const headers: Record<string, string> = {};
+      if (enabled) headers["x-zunex-demo"] = scenario;
+      const token = process.env.NEXT_PUBLIC_ZUNEX_DEMO_TOKEN;
+      if (enabled && token) headers["x-zunex-demo-token"] = token;
+      // keepalive: fire-and-forget must complete even as the page unloads.
+      fetch(`/api/sessions/${encodeURIComponent(id)}/demo/abort`, {
+        method: "POST",
+        headers,
+        keepalive: true,
+      }).catch(() => {});
+    } catch {
+      /* ignore — local teardown already cleared the restore keys */
+    }
+  }
+}
 
 interface DemoState {
   enabled: boolean;
@@ -68,6 +111,10 @@ export const useDemoStore = create<DemoState>()((set, get) => ({
     } catch {
       /* ignore */
     }
+    // Abort any live charging and clear restore keys BEFORE reload so the
+    // fresh boot always starts the chosen scenario from the welcome screen
+    // and the station is free.
+    abortAllLiveSessions();
     set({ scenario, panelOpen: false });
     // Re-arm the scenario across the whole app (server reads it per request).
     window.location.reload();

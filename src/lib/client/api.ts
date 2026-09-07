@@ -144,4 +144,15 @@ export const api = {
       `/api/sessions/${encodeURIComponent(sessionId)}/demo/payment`,
       { method: "POST", body: JSON.stringify({ outcome }) },
     ),
+
+  /**
+   * Demo-only: forcibly abort ANY session (incl. a live charging one) so the
+   * station frees up for a fresh demo run. keepalive lets it land even though
+   * the page reloads immediately after.
+   */
+  demoAbort: (sessionId: string) =>
+    request<{ ok: boolean }>(
+      `/api/sessions/${encodeURIComponent(sessionId)}/demo/abort`,
+      { method: "POST", keepalive: true },
+    ),
 };

@@ -60,8 +60,8 @@ export default function DemoPanel() {
             Demo scenarios
           </p>
           <p className="text-paper-dim text-xs text-center leading-relaxed mb-4">
-            Simulate real-world conditions across the entire journey — from QR
-            entry to charging completion. Switching reloads the app.
+            Simulate real-world conditions from QR entry to charge completion.
+            Choosing a scenario stops any live charging and restarts fresh.
           </p>
           <div className="flex flex-col gap-2">
             {DEMO_SCENARIOS.map((s) => {

@@ -294,4 +294,42 @@ export const sessionService = {
     }
     return toSnapshot(s);
   },
+
+  /**
+   * DEMO ONLY — forcibly tear down ANY session (including a live charging
+   * one) so the station frees up and a fresh demo run can begin. Cancels
+   * pending/paid sessions, stops hardware for active/starting/stopping ones.
+   * Idempotent: terminating an already-terminal session is harmless.
+   */
+  abortForDemo(sessionId: string): boolean {
+    const s = store.sessions.get(sessionId);
+    if (!s) return false;
+
+    const live: SessionState[] = ["starting", "charging_active", "stopping"];
+    if (live.includes(s.state)) {
+      const cmd = {
+        sessionId: s.id,
+        stationId: s.stationId,
+        minutes: planOf(s.planId)?.minutes ?? 15,
+      };
+      // Best-effort hardware stop — never block teardown on the ack.
+      void chargingHardware
+        .stop(cmd, "default")
+        .catch(() => {
+          /* mock/no hardware — nothing to release */
+        });
+    }
+
+    if (
+      s.state !== "cancelled" &&
+      s.state !== "charging_completed" &&
+      s.state !== "error"
+    ) {
+      s.state = "cancelled";
+    }
+    s.stopRequested = true;
+    s.startRequested = false;
+    s.updatedAt = Date.now();
+    return true;
+  },
 };
