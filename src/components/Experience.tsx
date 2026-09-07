@@ -8,6 +8,7 @@ import { api, ApiError } from "@/lib/client/api";
 import { useSessionSync } from "@/lib/client/useSessionSync";
 import { useCountdown } from "@/lib/client/useServerCountdown";
 import { useWakeLock } from "@/lib/client/useWakeLock";
+import { useDemoStore } from "@/lib/client/demoStore";
 import { playComplete, playStart } from "@/lib/client/sound";
 import InstallPrompt from "@/components/visuals/InstallPrompt";
 import { BrandHeader } from "@/components/brand/Logo";
@@ -67,10 +68,18 @@ export default function Experience({ stationId }: { stationId?: string }) {
   const [creating, setCreating] = useState(false);
   const startRequestedRef = useRef(false);
 
-  const { snapshot, connection, missing, refresh, clockOffsetRef } =
+  const { snapshot, connection, missing, refresh, applySnapshot, clockOffsetRef } =
     useSessionSync(sessionId);
   const { remainingMs } = useCountdown(snapshot, clockOffsetRef);
   useWakeLock(snapshot?.state === "charging_active");
+
+  // Demo mutations (payment simulate, fast-forward finish) bump this signal
+  // so we pull a fresh snapshot immediately instead of waiting for SSE
+  // (which can be buffered by production proxies).
+  const demoRefreshSignal = useDemoStore((s) => s.refreshSignal);
+  useEffect(() => {
+    if (demoRefreshSignal > 0 && sessionId) void refresh();
+  }, [demoRefreshSignal, sessionId, refresh]);
 
   // Safety net: when the local countdown hits zero, the server-side tick may
   // not have transitioned to charging_completed yet (SSE pushes every 1s,
@@ -169,12 +178,17 @@ export default function Experience({ stationId }: { stationId?: string }) {
     if (startRequestedRef.current) return;
     startRequestedRef.current = true;
     const timer = setTimeout(() => {
-      api.startCharging(sessionId).catch(() => {
+      api.startCharging(sessionId).then(({ snapshot: snap }) => {
+        // Apply the "starting" snapshot immediately so the UI flips to the
+        // handshake stage without waiting for the next SSE push (which can
+        // be buffered by production proxies).
+        applySnapshot(snap);
+      }).catch(() => {
         // Hardware layer will report failure through the session state.
       });
-    }, 1700); // let the unlock burst land first
+    }, 800); // let the unlock burst begin — no need to wait the full 1.4s
     return () => clearTimeout(timer);
-  }, [snapshot?.state, sessionId]);
+  }, [snapshot?.state, sessionId, applySnapshot]);
 
   // ---- Derive the active screen from backend truth --------------------------
   const state = snapshot?.state;
@@ -273,6 +287,9 @@ export default function Experience({ stationId }: { stationId?: string }) {
           idempotencyKey: crypto.randomUUID(),
         });
         adoptSession(snap.sessionId);
+        // Apply the payment_pending snapshot immediately so DurationScreen
+        // gets the session state without waiting for SSE.
+        applySnapshot(snap);
       } catch (err) {
         if (err instanceof ApiError && err.friendly) {
           setBootErrorCode(err.code);
@@ -282,17 +299,18 @@ export default function Experience({ stationId }: { stationId?: string }) {
         setCreating(false);
       }
     },
-    [normalizedId, creating, adoptSession],
+    [normalizedId, creating, adoptSession, applySnapshot],
   );
 
   const retryStart = useCallback(async () => {
     if (!sessionId) return;
     try {
-      await api.startCharging(sessionId, true);
+      const { snapshot: snap } = await api.startCharging(sessionId, true);
+      applySnapshot(snap);
     } catch {
       /* session state will surface the failure */
     }
-  }, [sessionId]);
+  }, [sessionId, applySnapshot]);
 
   const releaseAndRefund = useCallback(async () => {
     if (!sessionId) return;
@@ -391,6 +409,7 @@ export default function Experience({ stationId }: { stationId?: string }) {
             onSelect={(plan) => void choosePlan(plan.id)}
             onSessionCancelled={backToWelcome}
             onBack={() => setPhase("welcome")}
+            applySnapshot={applySnapshot}
           />
         )}
 

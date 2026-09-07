@@ -33,6 +33,7 @@ export default function DemoPanel() {
   const scenario = useDemoStore((s) => s.scenario);
   const cableConnected = useDemoStore((s) => s.cableConnected);
   const setCableConnected = useDemoStore((s) => s.setCableConnected);
+  const bumpRefresh = useDemoStore((s) => s.bumpRefresh);
 
   if (!enabled) return null;
 
@@ -129,14 +130,14 @@ export default function DemoPanel() {
                 <p className="eyebrow !text-[0.5625rem]">Payment simulation</p>
                 <div className="grid grid-cols-2 gap-2">
                   <GhostButton
-                    onClick={() => void api.demoPaySimulate(sid, "succeed").catch(() => {})}
+                    onClick={() => void api.demoPaySimulate(sid, "succeed").then(() => bumpRefresh()).catch(() => {})}
                     className="!py-2.5 !text-xs"
                     ariaLabel="Simulate payment success"
                   >
                     Payment success
                   </GhostButton>
                   <GhostButton
-                    onClick={() => void api.demoPaySimulate(sid, "fail").catch(() => {})}
+                    onClick={() => void api.demoPaySimulate(sid, "fail").then(() => bumpRefresh()).catch(() => {})}
                     className="!py-2.5 !text-xs"
                     ariaLabel="Simulate payment failure"
                   >
@@ -158,7 +159,7 @@ export default function DemoPanel() {
               <div className="mt-4 pt-4 border-t border-white/10 space-y-2">
                 <p className="eyebrow !text-[0.5625rem]">Session controls</p>
                 <GhostButton
-                  onClick={() => void api.demoFinish(sid).catch(() => {})}
+                  onClick={() => void api.demoFinish(sid).then(() => bumpRefresh()).catch(() => {})}
                   className="!py-2.5 !text-xs"
                 >
                   Fast-forward to completion

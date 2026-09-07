@@ -19,6 +19,10 @@ export interface SessionSync {
   connection: ConnectionQuality;
   missing: boolean;
   refresh: () => Promise<void>;
+  /** Optimistically apply a snapshot returned from a mutation API call
+   *  so the UI transitions instantly instead of waiting for the next
+   *  SSE push (which can be delayed on production proxies). */
+  applySnapshot: (s: SessionSnapshot) => void;
   clockOffsetRef: React.MutableRefObject<number>;
 }
 
@@ -120,5 +124,5 @@ export function useSessionSync(sessionId: string | null): SessionSync {
     };
   }, [sessionId, refresh, applySnapshot]);
 
-  return { snapshot, connection, missing, refresh, clockOffsetRef };
+  return { snapshot, connection, missing, refresh, applySnapshot, clockOffsetRef };
 }

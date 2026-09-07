@@ -89,10 +89,15 @@ interface DemoState {
   hydrated: boolean;
   /** Simulated cable state for the free-charge flow (demo mode only). */
   cableConnected: boolean;
+  /** Incremented after a demo mutation (payment/finish) so the session
+   *  sync knows to pull a fresh snapshot immediately — SSE on production
+   *  proxies can lag. */
+  refreshSignal: number;
   hydrate: (params: { demo?: boolean }) => void;
   setScenario: (scenario: DemoScenario) => void;
   setPanelOpen: (open: boolean) => void;
   setCableConnected: (connected: boolean) => void;
+  bumpRefresh: () => void;
 }
 
 export const useDemoStore = create<DemoState>()((set, get) => ({
@@ -101,6 +106,7 @@ export const useDemoStore = create<DemoState>()((set, get) => ({
   panelOpen: false,
   hydrated: false,
   cableConnected: true,
+  refreshSignal: 0,
   hydrate: ({ demo }) => {
     if (get().hydrated) return;
     let scenario: DemoScenario = "default";
@@ -137,6 +143,7 @@ export const useDemoStore = create<DemoState>()((set, get) => ({
   },
   setPanelOpen: (panelOpen) => set({ panelOpen }),
   setCableConnected: (cableConnected) => set({ cableConnected }),
+  bumpRefresh: () => set((s) => ({ refreshSignal: s.refreshSignal + 1 })),
 }));
 
 export const DEMO_SCENARIOS = SCENARIOS;

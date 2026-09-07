@@ -94,6 +94,7 @@ export default function DurationScreen({
   onSelect,
   onSessionCancelled,
   onBack,
+  applySnapshot,
 }: {
   station: Station;
   /** Present while the session is awaiting payment — the page then runs the payment inline. */
@@ -102,6 +103,8 @@ export default function DurationScreen({
   onSelect: (plan: ChargingPlan) => void;
   onSessionCancelled: () => void;
   onBack: () => void;
+  /** Apply a snapshot returned from a mutation so the UI transitions instantly. */
+  applySnapshot: (s: SessionSnapshot) => void;
 }) {
   const demoEnabled = useDemoStore((s) => s.enabled);
   const [selected, setSelected] = useState<string | null>(null);
@@ -142,8 +145,11 @@ export default function DurationScreen({
     confirmRequested.current = true;
     setConfirmState("verifying");
     try {
-      await api.confirmPayment(sessionId);
-      // Success flows through the session snapshot → Experience transitions.
+      const { snapshot: snap } = await api.confirmPayment(sessionId);
+      // Apply the payment_successful snapshot immediately so the UI flips
+      // to the activation screen without waiting for the next SSE push
+      // (which can be delayed/buffered on production proxies).
+      applySnapshot(snap);
       setWaitingApp(null);
       setMethod(null);
       setConfirmState("idle");
@@ -153,7 +159,7 @@ export default function DurationScreen({
     } finally {
       confirmRequested.current = false;
     }
-  }, [sessionId]);
+  }, [sessionId, applySnapshot]);
 
   // Demo mode: auto-confirm a moment after "opening" the payment app.
   useEffect(() => {
