@@ -173,15 +173,19 @@ export default function DurationScreen({
       setMethod(null); // the pending choice is consumed
       setWaitingApp(app);
       if (confirmState === "failed") setConfirmState("idle");
-      if (app.uri) {
-        try {
-          window.location.href = app.uri;
-        } catch {
-          /* scheme navigation is best-effort */
-        }
+      if (app.uri && !demoEnabled) {
+        // Use a hidden iframe to trigger the UPI scheme without navigating
+        // the whole page away. On phones with a UPI app installed this opens
+        // the app; if no app is installed the page stays intact (no blank
+        // "Go Back" error screen).
+        const iframe = document.createElement("iframe");
+        iframe.style.cssText = "display:none;border:0;width:0;height:0;";
+        iframe.src = app.uri;
+        document.body.appendChild(iframe);
+        setTimeout(() => iframe.remove(), 1500);
       }
     },
-    [confirmState],
+    [confirmState, demoEnabled],
   );
 
   // A method chosen before the session existed starts as soon as it lands —

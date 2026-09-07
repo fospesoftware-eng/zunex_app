@@ -180,12 +180,14 @@ export default function WiFiScreen({ onDone }: { onDone: () => void }) {
   const startPayment = (app: UpiAppTarget) => {
     setWaitingApp(app);
     if (confirmState === "failed") setConfirmState("idle");
-    if (app.uri) {
-      try {
-        window.location.href = app.uri;
-      } catch {
-        /* scheme navigation is best-effort */
-      }
+    if (app.uri && !demoEnabled) {
+      // Hidden iframe triggers the UPI scheme without navigating the page
+      // away — avoids the blank "Go Back" error when no UPI app is installed.
+      const iframe = document.createElement("iframe");
+      iframe.style.cssText = "display:none;border:0;width:0;height:0;";
+      iframe.src = app.uri;
+      document.body.appendChild(iframe);
+      setTimeout(() => iframe.remove(), 1500);
     }
   };
 
