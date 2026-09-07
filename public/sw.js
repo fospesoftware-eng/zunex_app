@@ -5,7 +5,7 @@
    - API / SSE / non-GET: never touched.
 */
 
-const CACHE = "zunex-shell-v3";
+const CACHE = "zunex-shell-v4";
 const CORE = [
   "/",
   "/manifest.webmanifest",
