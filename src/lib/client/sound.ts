@@ -150,6 +150,66 @@ export function playTap(): void {
 }
 
 /**
+ * Start sound — the instant charging engages. A quick rising "power-up"
+ * chirp (D5 → A5, perfect fifth) that locks into a steady low hum for
+ * ~400ms. Evokes the inverter engaging — energy flowing through the
+ * cable. Distinct from tap (playful) and complete (celebratory); this is
+ * industrial-premium, confirming power is active.
+ */
+export function playStart(): void {
+  const c = getCtx();
+  if (!c) return;
+  ensureRunning(c);
+  const t = c.currentTime;
+
+  // Quick rising fifth — the "power engages" click/chirp.
+  playTone({
+    freq: 587.33, // D5
+    startAt: t + 0.0,
+    duration: 0.12,
+    type: "triangle",
+    peak: 0.5,
+    attack: 0.003,
+    release: 0.08,
+    harmonic: { ratio: 2, level: 0.2 },
+  });
+  playTone({
+    freq: 880.0, // A5 — perfect fifth up
+    startAt: t + 0.04,
+    duration: 0.14,
+    type: "triangle",
+    peak: 0.45,
+    attack: 0.003,
+    release: 0.1,
+    harmonic: { ratio: 2, level: 0.18 },
+  });
+
+  // Settling low hum — confirms power is steady, not transient.
+  playTone({
+    freq: 146.83, // D3 — an octave below D5, grounded
+    startAt: t + 0.1,
+    duration: 0.35,
+    type: "sine",
+    peak: 0.28,
+    attack: 0.02,
+    release: 0.3,
+    harmonic: { ratio: 3, level: 0.08 }, // subtle 3rd harmonic for warmth
+  });
+
+  // A tiny voltage "tick" — imperceptible alone, adds realism in context.
+  const tick = c.createOscillator();
+  tick.type = "square";
+  tick.frequency.setValueAtTime(1200, t + 0.015);
+  const tg = c.createGain();
+  tg.gain.setValueAtTime(0.08, t + 0.015);
+  tg.gain.exponentialRampToValueAtTime(0.0001, t + 0.03);
+  tick.connect(tg);
+  tg.connect(masterGain!);
+  tick.start(t + 0.015);
+  tick.stop(t + 0.04);
+}
+
+/**
  * Complete sound — a warm C-major arpeggio (C5 → E5 → G5 → C6) with bell-like
  * decay. Each note overlaps slightly with the next for a lush, resonant tail.
  * ~1.5s total.
