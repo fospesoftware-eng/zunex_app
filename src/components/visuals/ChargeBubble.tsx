@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
+import { playTap } from "@/lib/client/sound";
 
 // ---------------------------------------------------------------------------
 // ChargeBubble — the tap-to-charge hero. A floating glass sphere holding the
@@ -46,6 +47,7 @@ export default function ChargeBubble({
 
   const tap = useCallback(() => {
     if (disabled || bursting) return;
+    playTap();
     if (reduceMotion) {
       onCharge();
       return;

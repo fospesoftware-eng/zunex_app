@@ -93,6 +93,7 @@ export default function InstallPrompt({ delayMs = 15000 }: { delayMs?: number })
 
   const install = async () => {
     if (deferred) {
+      // Android / Chrome native install prompt.
       await deferred.prompt();
       try {
         const choice = await deferred.userChoice;
@@ -102,11 +103,30 @@ export default function InstallPrompt({ delayMs = 15000 }: { delayMs?: number })
       }
       deferredPrompt = null;
       setDeferred(null);
-    } else if (!ios) {
-      // No native event (unsupported browser) — keep the hint, dismiss on tap.
+    } else if (ios) {
+      // iOS Safari has no beforeinstallprompt — but navigator.share() opens
+      // the native share sheet, which is where "Add to Home Screen" lives.
+      try {
+        if (navigator.share) {
+          await navigator.share({
+            title: "ZUNEX",
+            text: "Install ZUNEX — premium charging at your station",
+            url: window.location.href,
+          });
+          setVisible(false);
+        } else {
+          // Older iOS without Web Share API — just dismiss after the user
+          // has seen the hint text.
+          dismiss();
+        }
+      } catch {
+        // User cancelled the share sheet — keep the banner visible, they
+        // may change their mind.
+      }
+    } else {
+      // No native event and not iOS — browser is unsupported.
       dismiss();
     }
-    // iOS: the banner itself contains the steps; its close button dismisses.
   };
 
   return (
@@ -139,7 +159,7 @@ export default function InstallPrompt({ delayMs = 15000 }: { delayMs?: number })
             )}
           </div>
 
-          {deferred && !ios && (
+          {(deferred || ios) && (
             <button type="button" className="install-btn font-display" onClick={install}>
               Install
             </button>

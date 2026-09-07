@@ -8,6 +8,7 @@ import { api, ApiError } from "@/lib/client/api";
 import { useSessionSync } from "@/lib/client/useSessionSync";
 import { useCountdown } from "@/lib/client/useServerCountdown";
 import { useWakeLock } from "@/lib/client/useWakeLock";
+import { playComplete } from "@/lib/client/sound";
 import { BrandHeader } from "@/components/brand/Logo";
 import EnergyOrb from "@/components/visuals/EnergyOrb";
 import WelcomeScreen from "@/components/screens/WelcomeScreen";
@@ -180,6 +181,17 @@ export default function Experience({ stationId }: { stationId?: string }) {
   useEffect(() => {
     if (state === "cancelled") clearSession();
   }, [state, clearSession]);
+
+  // ---- Play the completion chime exactly once when the session transitions ----
+  // to charging_completed (not on every re-render while already completed).
+  const prevStateRef = useRef(state);
+  useEffect(() => {
+    const prev = prevStateRef.current;
+    prevStateRef.current = state;
+    if (state === "charging_completed" && prev !== "charging_completed") {
+      playComplete();
+    }
+  }, [state]);
 
   useEffect(() => {
     if (missing) clearSession();
