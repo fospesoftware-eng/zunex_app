@@ -214,8 +214,18 @@ export default function Experience({ stationId }: { stationId?: string }) {
   } else if (!sessionId) {
     screen = phase; // welcome | select | wifi | free
   } else if (!snapshot) {
-    screen = "boot";
-    bootLabel = "Restoring your session";
+    // We have a sessionId but the snapshot hasn't arrived yet (network
+    // latency — production vs instant localhost). If we just created this
+    // session from the select/payment flow, stay on the current phase so
+    // DurationScreen doesn't unmount and lose its local state (selected
+    // method). Only go to boot when truly restoring a persisted session
+    // on initial load.
+    if (phase === "boot") {
+      screen = "boot";
+      bootLabel = "Restoring your session";
+    } else {
+      screen = phase; // stay on welcome | select | wifi | free
+    }
   } else if (snapshot.stationId !== normalizedId) {
     // Stale session from another station — discard (effect below clears it).
     screen = "boot";

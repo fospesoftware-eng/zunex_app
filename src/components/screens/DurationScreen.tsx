@@ -178,9 +178,13 @@ export default function DurationScreen({
     [confirmState],
   );
 
-  // A method chosen before the session existed starts as soon as it lands.
+  // A method chosen before the session existed starts as soon as it lands —
+  // but only once the payment intent is loaded, since that's where the real
+  // UPI URIs live. On a slow network the intent can lag behind the snapshot;
+  // firing startPayment before it arrives leaves us with empty URIs and a
+  // waiting sheet that never navigates.
   useEffect(() => {
-    if (!pending || !method || waitingApp) return;
+    if (!pending || !method || waitingApp || !intent) return;
     const target = intent?.apps.find((a) => a.id === method.id) ?? method;
     startPayment(target);
   }, [pending, method, waitingApp, intent, startPayment]);
@@ -192,6 +196,12 @@ export default function DurationScreen({
       // session is created and the snapshot arrives.
       setMethod(app);
       onSelect(activePlan);
+      return;
+    }
+    if (!intent) {
+      // Session exists but intent hasn't loaded yet — queue the choice and
+      // let the effect fire startPayment once intent arrives with real URIs.
+      setMethod(app);
       return;
     }
     const target = intent?.apps.find((a) => a.id === app.id) ?? app;
