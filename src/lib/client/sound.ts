@@ -96,49 +96,57 @@ function playTone(opts: {
 }
 
 /**
- * Tap sound — a crystalline ping with a gentle upward frequency sweep
- * and a barely-audible shimmer. ~180ms total. Throttled to max once per 120ms
- * so rapid taps don't stack.
+ * Tap sound — a warm, positive C-major chirp: C5 → E5 → G5 played as a
+ * tight three-note arpeggio (~60ms apart). It's a friendly "spark" — like
+ * a doorbell welcoming you or energy igniting. Sine fundamentals with
+ * subtle triangle harmonics give it warmth; a quick sparkle overtone adds
+ * the premium snap. ~300ms total. Throttled to once per 150ms.
  */
 export function playTap(): void {
   const c = getCtx();
   if (!c) return;
   const now = Date.now();
-  if (now - lastTapAt < 120) return;
+  if (now - lastTapAt < 150) return;
   lastTapAt = now;
 
   ensureRunning(c);
   const t = c.currentTime;
 
-  // Soft upward sweep from ~880Hz to ~1320Hz — a perfect fifth glide.
-  const osc = c.createOscillator();
-  osc.type = "sine";
-  osc.frequency.setValueAtTime(880, t);
-  osc.frequency.exponentialRampToValueAtTime(1318.51, t + 0.12);
+  // Three-note C-major chirp, tight timing so it feels like one warm chord
+  // with a melodic tail — not a slow arpeggio.
+  const notes: { freq: number; start: number; peak: number; dur: number; harm: number }[] = [
+    { freq: 523.25, start: t + 0.0, peak: 0.5, dur: 0.28, harm: 0.18 },  // C5
+    { freq: 659.25, start: t + 0.035, peak: 0.42, dur: 0.25, harm: 0.15 }, // E5
+    { freq: 783.99, start: t + 0.07, peak: 0.35, dur: 0.22, harm: 0.12 },  // G5
+  ];
 
-  const gain = c.createGain();
-  gain.gain.setValueAtTime(0.0001, t);
-  gain.gain.exponentialRampToValueAtTime(0.55, t + 0.01);
-  gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.17);
+  for (const n of notes) {
+    playTone({
+      freq: n.freq,
+      startAt: n.start,
+      duration: n.dur,
+      type: "sine",
+      peak: n.peak,
+      attack: 0.005,
+      release: n.dur * 0.65,
+      harmonic: { ratio: 2, level: n.harm },
+    });
+  }
 
-  osc.connect(gain);
-  gain.connect(masterGain!);
-  osc.start(t);
-  osc.stop(t + 0.2);
-
-  // Shimmer harmonic at the octave, very quiet, for that frozen-raindrop feel.
-  const shimmer = c.createOscillator();
-  shimmer.type = "sine";
-  shimmer.frequency.setValueAtTime(1760, t);
-  shimmer.frequency.exponentialRampToValueAtTime(2637, t + 0.12);
+  // A quick sparkle overtone — rises fast, vanishes fast — gives that
+  // premium "snap" feeling at the very beginning, like a tiny ignition.
+  const spark = c.createOscillator();
+  spark.type = "triangle";
+  spark.frequency.setValueAtTime(1568, t);     // G6
+  spark.frequency.exponentialRampToValueAtTime(2093, t + 0.05); // C7
   const sg = c.createGain();
   sg.gain.setValueAtTime(0.0001, t);
-  sg.gain.exponentialRampToValueAtTime(0.15, t + 0.012);
-  sg.gain.exponentialRampToValueAtTime(0.0001, t + 0.15);
-  shimmer.connect(sg);
+  sg.gain.exponentialRampToValueAtTime(0.18, t + 0.008);
+  sg.gain.exponentialRampToValueAtTime(0.0001, t + 0.09);
+  spark.connect(sg);
   sg.connect(masterGain!);
-  shimmer.start(t);
-  shimmer.stop(t + 0.18);
+  spark.start(t);
+  spark.stop(t + 0.12);
 }
 
 /**
