@@ -1,6 +1,6 @@
 "use client";
 
-import { DEMO_SCENARIOS, useDemoStore } from "@/lib/client/demoStore";
+import { DEMO_SCENARIOS, abortServerSessions, useDemoStore } from "@/lib/client/demoStore";
 import { api } from "@/lib/client/api";
 import { GhostButton, Sheet } from "@/components/ui/kit";
 import type { DemoScenario } from "@/lib/core/types";
@@ -40,7 +40,13 @@ export default function DemoPanel() {
     <>
       <button
         type="button"
-        onClick={() => setPanelOpen(true)}
+        onClick={() => {
+          // Clear any lingering server-side charges so the station isn't
+          // "busy" when the demo panel opens. Fire-and-forget — the request
+          // lands in the background while the panel animates in.
+          abortServerSessions();
+          setPanelOpen(true);
+        }}
         aria-label="Open demo controls"
         className="fixed z-30 right-4 font-display font-bold text-[1.05rem] leading-none select-none demo-d"
         style={{ top: "calc(var(--safe-top) + 12px)" }}

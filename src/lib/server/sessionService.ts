@@ -360,4 +360,18 @@ export const sessionService = {
     s.updatedAt = Date.now();
     return true;
   },
+
+  /**
+   * DEMO ONLY — abort EVERY non-terminal session in the store so no stale
+   * charge lingers and holds any station "busy". Returns the number of
+   * sessions that were actually aborted.
+   */
+  abortAllForDemo(): number {
+    let count = 0;
+    for (const s of store.sessions.values()) {
+      const wasAborted = this.abortForDemo(s.id);
+      if (wasAborted) count++;
+    }
+    return count;
+  },
 };

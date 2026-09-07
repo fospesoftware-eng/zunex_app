@@ -155,4 +155,15 @@ export const api = {
       `/api/sessions/${encodeURIComponent(sessionId)}/demo/abort`,
       { method: "POST", keepalive: true },
     ),
+
+  /**
+   * Demo-only: abort EVERY session on the server (incl. live charging) so no
+   * stale charge lingers and holds any station "busy". keepalive ensures
+   * the request lands even if the page unloads.
+   */
+  demoAbortAll: () =>
+    request<{ count: number }>(
+      `/api/sessions/demo/abort-all`,
+      { method: "POST", keepalive: true },
+    ),
 };

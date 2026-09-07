@@ -2,6 +2,7 @@
 
 import { create } from "zustand";
 import type { DemoScenario } from "@/lib/core/types";
+import { api } from "@/lib/client/api";
 
 // ---------------------------------------------------------------------------
 // Demo mode state. Enabled via ?demo=1 on the URL (or remembered locally).
@@ -25,44 +26,59 @@ const LS_KEY = "zunex:demo-scenario";
 const SESSION_KEY_PREFIX = "zunex:session";
 
 /**
- * Tear down every live session before a demo run so a real/previous charge
- * never lingers and holds the station "busy". We:
- *  1. gather every stored session id (zunex:session[:station]),
- *  2. ask the server to abort it (force-cancel, stop hardware) via the
- *     demo abort endpoint — keepalive so it survives the imminent reload,
- *  3. remove the local restore keys so the app boots at the welcome screen.
+ * Clear all session restore keys from localStorage so the app boots fresh.
+ * Does NOT touch the server — that's the caller's job (or use abortAllLiveSessions).
  */
-function abortAllLiveSessions() {
-  const { enabled, scenario } = useDemoStore.getState();
-  const ids = new Set<string>();
+function clearLocalSessionKeys(): void {
   try {
+    const toRemove: string[] = [];
     for (let i = localStorage.length - 1; i >= 0; i--) {
       const key = localStorage.key(i);
-      if (key && key.startsWith(SESSION_KEY_PREFIX)) {
-        const v = localStorage.getItem(key);
-        if (v) ids.add(v);
-        localStorage.removeItem(key);
-      }
+      if (key && key.startsWith(SESSION_KEY_PREFIX)) toRemove.push(key);
     }
+    for (const k of toRemove) localStorage.removeItem(k);
   } catch {
     /* storage unavailable */
   }
+}
 
-  for (const id of ids) {
+/**
+ * DEMO ONLY — abort EVERY session on the server (incl. live charging) and
+ * clear local restore keys so a fresh demo run always starts clean. Fires
+ * the server request with keepalive so it lands even if the page unloads.
+ */
+export function abortAllLiveSessions(): void {
+  const { enabled } = useDemoStore.getState();
+
+  // 1. Server-side: abort EVERY session across all stations — catches
+  //    orphans from other tabs / crashed clients that localStorage never
+  //    knew about. keepalive guarantees it lands even during a reload.
+  if (enabled) {
     try {
-      const headers: Record<string, string> = {};
-      if (enabled) headers["x-zunex-demo"] = scenario;
-      const token = process.env.NEXT_PUBLIC_ZUNEX_DEMO_TOKEN;
-      if (enabled && token) headers["x-zunex-demo-token"] = token;
-      // keepalive: fire-and-forget must complete even as the page unloads.
-      fetch(`/api/sessions/${encodeURIComponent(id)}/demo/abort`, {
-        method: "POST",
-        headers,
-        keepalive: true,
-      }).catch(() => {});
+      api.demoAbortAll().catch(() => {
+        /* fire-and-forget — server teardown is best-effort */
+      });
     } catch {
-      /* ignore — local teardown already cleared the restore keys */
+      /* ignore — local teardown still happens below */
     }
+  }
+
+  // 2. Clear local restore keys so the app boots at the welcome screen.
+  clearLocalSessionKeys();
+}
+
+/**
+ * Fire-and-forget server-side abort only — no local state change, no reload.
+ * Used when the user just opens the demo panel to peek; we still want to
+ * clear any lingering charges so the station isn't "busy".
+ */
+export function abortServerSessions(): void {
+  const { enabled } = useDemoStore.getState();
+  if (!enabled) return;
+  try {
+    api.demoAbortAll().catch(() => {});
+  } catch {
+    /* ignore */
   }
 }
 
