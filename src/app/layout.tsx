@@ -30,8 +30,12 @@ export const metadata: Metadata = {
     "apple-mobile-web-app-capable": "yes",
   },
   icons: {
-    icon: "/brand/zunex-icon.svg",
-    apple: "/brand/zunex-icon.svg",
+    icon: [
+      { url: "/brand/favicon-96.png", sizes: "96x96", type: "image/png" },
+      { url: "/brand/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/brand/zunex-icon.svg", type: "image/svg+xml" },
+    ],
+    apple: [{ url: "/brand/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
   },
 };
 

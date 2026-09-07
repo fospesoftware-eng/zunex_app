@@ -5,12 +5,15 @@
    - API / SSE / non-GET: never touched.
 */
 
-const CACHE = "zunex-shell-v2";
+const CACHE = "zunex-shell-v3";
 const CORE = [
   "/",
   "/manifest.webmanifest",
-  "/brand/zunex-icon.svg",
-  "/brand/zunex-icon-maskable.svg",
+  "/brand/icon-192.png",
+  "/brand/icon-512.png",
+  "/brand/icon-maskable-192.png",
+  "/brand/icon-maskable-512.png",
+  "/brand/apple-touch-icon.png",
 ];
 
 self.addEventListener("install", (event) => {
