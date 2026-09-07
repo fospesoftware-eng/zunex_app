@@ -129,17 +129,30 @@ export default function InstallPrompt({ delayMs = 15000 }: { delayMs?: number })
     }
   };
 
+  const handleBannerTap = (e: React.MouseEvent) => {
+    // Don't trigger install when clicking the close button or the Install
+    // button itself — they have their own handlers.
+    const target = e.target as HTMLElement;
+    if (target.closest(".install-close") || target.closest(".install-btn")) return;
+    // Only make the banner body clickable when there's no deferred prompt
+    // (iOS path, or unsupported browsers). On Android with deferred, the
+    // Install button is the right call — banner tap would be ambiguous.
+    if (!deferred) void install();
+  };
+
   return (
     <AnimatePresence>
       {visible && (
         <motion.div
           className="install-banner"
+          onClick={handleBannerTap}
           initial={{ y: "-110%", opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           exit={{ y: "-110%", opacity: 0 }}
           transition={{ type: "spring", stiffness: 260, damping: 28 }}
           role="dialog"
           aria-label="Install the ZUNEX app"
+          style={!deferred ? { cursor: "pointer" } : undefined}
         >
           <div className="install-icon" aria-hidden="true">
             <Icon name="download" size={18} />
