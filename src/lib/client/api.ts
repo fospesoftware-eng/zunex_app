@@ -2,6 +2,7 @@
 
 import type {
   ApiEnvelope,
+  ChargingPlan,
   FriendlyError,
   PaymentIntentDTO,
   SessionSnapshot,
@@ -165,5 +166,18 @@ export const api = {
     request<{ count: number }>(
       `/api/sessions/demo/abort-all`,
       { method: "POST", keepalive: true },
+    ),
+
+  // ---- WiFi data add-ons ----
+  wifiCreateIntent: (planId: string) =>
+    request<{ intent: PaymentIntentDTO; plan: ChargingPlan; wifiId: string }>(
+      `/api/wifi/payment`,
+      { method: "POST", body: JSON.stringify({ planId }) },
+    ),
+
+  wifiConfirmPayment: (intentId: string) =>
+    request<{ ok: boolean }>(
+      `/api/wifi/payment/confirm`,
+      { method: "POST", body: JSON.stringify({ intentId }) },
     ),
 };

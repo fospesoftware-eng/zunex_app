@@ -75,6 +75,13 @@ export const FREE_PLANS: ChargingPlan[] = [
   { id: "free10", minutes: 10, pricePaise: 0, label: "Free boost", tagline: "60s ad · 10 min free" },
 ];
 
+// WiFi data add-ons — purchased alongside or instead of charging. Not a
+// charging plan (no minutes/hardware), just a data allowance unlock.
+export const WIFI_PLANS: ChargingPlan[] = [
+  { id: "wifi1", minutes: 0, pricePaise: 1000, label: "1GB", tagline: "1 GB data · ₹10" },
+  { id: "wifi2", minutes: 0, pricePaise: 2000, label: "2GB", tagline: "2 GB data · ₹20" },
+];
+
 export const PAYMENT_PENDING_TTL_MS = 15 * 60 * 1000;
 
 /**
