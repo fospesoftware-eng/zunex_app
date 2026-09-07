@@ -64,7 +64,6 @@ export const PLANS: ChargingPlan[] = [
   { id: "trial", minutes: 0.5, pricePaise: 100, label: "Trial", tagline: "30 seconds · quick test" },
   { id: "p15", minutes: 15, pricePaise: 2000, label: "Quick", tagline: "A fast top-up" },
   { id: "p30", minutes: 30, pricePaise: 3500, label: "Standard", tagline: "The everyday boost" },
-  { id: "p60", minutes: 60, pricePaise: 6000, label: "Full", tagline: "Maximum charge" },
 ];
 
 // Ad-sponsored plans — earned by watching an ad, never listed on the station
