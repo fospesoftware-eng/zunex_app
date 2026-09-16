@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutDashboard,
   Cpu,
@@ -47,7 +47,7 @@ const NAV_GROUPS: NavGroup[] = [
       { href: "/backend/hardware", label: "Hardware", icon: Wifi },
       { href: "/backend/sessions", label: "Sessions", icon: Activity, badge: "live-sessions" },
       { href: "/backend/analytics", label: "Analytics", icon: LineChart },
-      { href: "/backend/device-map", label: "Device Map", icon: Map },
+      { href: "/backend/location-map", label: "Location Map", icon: Map },
       { href: "/backend/reports", label: "Reports", icon: FileSpreadsheet },
     ],
   },
@@ -86,6 +86,19 @@ interface Props {
 export function Sidebar({ open, onClose }: Props) {
   const pathname = usePathname();
   const [liveCount, setLiveCount] = useState(3);
+  const [isDesktop, setIsDesktop] = useState(false);
+
+  // Track viewport size so we only use Framer Motion transforms on mobile.
+  // On desktop we rely on static Tailwind `lg:translate-x-0` — Framer Motion
+  // inline transform ALWAYS wins over Tailwind classes, so we must not
+  // animate `x` on desktop.
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 1024px)");
+    const update = () => setIsDesktop(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
 
   // Simulated live session counter — changes every 5 seconds
   useEffect(() => {
@@ -98,10 +111,16 @@ export function Sidebar({ open, onClose }: Props) {
     return () => clearInterval(interval);
   }, []);
 
+  // Framer Motion animate — desktop forces x:0 (no transform), mobile uses
+  // the slide-in toggle.
+  const asideAnimate = isDesktop
+    ? { x: 0 }
+    : { x: open ? 0 : "-100%" };
+
   return (
     <>
       {/* Mobile overlay */}
-      {open && (
+      {open && !isDesktop && (
         <div
           className="fixed inset-0 bg-black/60 z-30 lg:hidden"
           onClick={onClose}
@@ -109,7 +128,7 @@ export function Sidebar({ open, onClose }: Props) {
       )}
       <motion.aside
         initial={false}
-        animate={{ x: open ? 0 : "-100%" }}
+        animate={asideAnimate}
         transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
         className="fixed top-0 left-0 bottom-0 w-64 z-40 lg:translate-x-0 flex flex-col border-r border-white/5"
         style={{

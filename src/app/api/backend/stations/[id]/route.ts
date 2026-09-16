@@ -33,6 +33,12 @@ export async function PATCH(
     powerWatts: number;
     connector: string;
     baseStatus: "available" | "maintenance" | "offline";
+    deviceModel: "core" | "plus";
+    installType: "car" | "mall" | "retail" | "outdoor" | "highway" | "office";
+    city: string;
+    state: string;
+    lat: number;
+    lng: number;
   }>;
   try {
     patch = (await req.json()) as typeof patch;

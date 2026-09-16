@@ -31,6 +31,9 @@ export interface ChargingPlan {
   tagline: string;
 }
 
+export type DeviceModel = "core" | "plus";
+export type InstallType = "car" | "mall" | "retail" | "outdoor" | "highway" | "office";
+
 export interface Station {
   id: string;
   name: string;
@@ -39,6 +42,12 @@ export interface Station {
   powerWatts: number;
   connector: string;
   plans: ChargingPlan[];
+  deviceModel: DeviceModel;
+  installType: InstallType;
+  city: string;
+  state: string;
+  lat: number;
+  lng: number;
 }
 
 export interface PaymentIntentDTO {

@@ -65,6 +65,10 @@ export default function App({
 
   useEffect(() => {
     hydrate({ demo });
+
+    // Lock scroll on the mobile app — we undo this when the backend renders.
+    document.documentElement.classList.add("zunex-app-root");
+
     if (preview) {
       try {
         localStorage.setItem("zunex:preview", "1");
@@ -82,6 +86,9 @@ export default function App({
         });
       });
     }
+    return () => {
+      document.documentElement.classList.remove("zunex-app-root");
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

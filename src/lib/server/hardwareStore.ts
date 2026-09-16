@@ -26,6 +26,11 @@ export interface HardwareConfig {
   connectionStatus: ConnectionStatus;
   telemetryEnabled: boolean;
   updatedAt: number;
+  deviceModel: "core" | "plus";
+  installType: "car" | "mall" | "retail" | "outdoor" | "highway" | "office";
+  city: string;
+  lat: number;
+  lng: number;
 }
 
 const DATA_DIR = join(process.cwd(), "data");
@@ -50,22 +55,34 @@ function now(): number {
 
 function seed(): HardwareConfig[] {
   const t = now();
-  const stations = ["ZNX-A1", "ZNX-B2", "ZNX-L1", "ZNX-K3"];
-  return stations.map((stationId, i) => ({
-    id: `hw_${stationId}`,
-    stationId,
-    deviceId: `ZXN-DVC-${stationId}-00${i + 1}`,
+  const stationData = [
+    { stationId: "ZNX-A1", deviceModel: "plus" as const, installType: "mall" as const, city: "Mumbai", lat: 19.0760, lng: 72.8777, firmware: "v2.0.4" },
+    { stationId: "ZNX-B2", deviceModel: "core" as const, installType: "retail" as const, city: "Bangalore", lat: 12.9716, lng: 77.5946, firmware: "v2.1.4" },
+    { stationId: "ZNX-L1", deviceModel: "plus" as const, installType: "highway" as const, city: "Delhi", lat: 28.6139, lng: 77.2090, firmware: "v2.2.4" },
+    { stationId: "ZNX-K3", deviceModel: "core" as const, installType: "office" as const, city: "Chennai", lat: 13.0827, lng: 80.2707, firmware: "v2.3.4" },
+    { stationId: "ZNX-M1", deviceModel: "plus" as const, installType: "car" as const, city: "Hyderabad", lat: 17.3850, lng: 78.4867, firmware: "v2.4.4" },
+    { stationId: "ZNX-C1", deviceModel: "core" as const, installType: "outdoor" as const, city: "Kolkata", lat: 22.5726, lng: 88.3639, firmware: "v2.5.4" },
+  ];
+  return stationData.map((s, i) => ({
+    id: `hw_${s.stationId}`,
+    stationId: s.stationId,
+    deviceId: `ZXN-DVC-${s.stationId}-00${i + 1}`,
     brokerUrl: "mqtt://broker.zunexglobal.com",
-    mqttTopic: `zunex/stations/${stationId}`,
+    mqttTopic: `zunex/stations/${s.stationId}`,
     mqttPort: 1883,
     username: "zunex_device",
-    password: `dev_${stationId.toLowerCase()}`,
-    firmwareVersion: `v2.${i}.4`,
+    password: `dev_${s.stationId.toLowerCase()}`,
+    firmwareVersion: s.firmware,
     heartbeatIntervalMs: 30000,
-    lastSeenAt: t - (i * 2 + 1) * 1000, // slightly staggered
-    connectionStatus: i < 3 ? "online" : "offline",
+    lastSeenAt: t - (i * 2 + 1) * 1000,
+    connectionStatus: s.stationId === "ZNX-L1" ? "offline" : "online",
     telemetryEnabled: true,
     updatedAt: t,
+    deviceModel: s.deviceModel,
+    installType: s.installType,
+    city: s.city,
+    lat: s.lat,
+    lng: s.lng,
   }));
 }
 

@@ -22,6 +22,11 @@ interface UpsertBody {
   heartbeatIntervalMs?: number;
   connectionStatus?: "online" | "offline" | "connecting" | "unknown";
   telemetryEnabled?: boolean;
+  deviceModel?: "core" | "plus";
+  installType?: "car" | "mall" | "retail" | "outdoor" | "highway" | "office";
+  city?: string;
+  lat?: number;
+  lng?: number;
 }
 
 export async function POST(req: Request) {
@@ -48,6 +53,11 @@ export async function POST(req: Request) {
     heartbeatIntervalMs: body.heartbeatIntervalMs ?? 30000,
     connectionStatus: body.connectionStatus ?? "unknown",
     telemetryEnabled: body.telemetryEnabled ?? true,
+    deviceModel: body.deviceModel ?? "core",
+    installType: body.installType ?? "office",
+    city: body.city ?? "",
+    lat: body.lat ?? 0,
+    lng: body.lng ?? 0,
   });
   return jsonOk(h, { status: 201 });
 }

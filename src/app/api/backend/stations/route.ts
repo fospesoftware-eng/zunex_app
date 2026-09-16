@@ -21,6 +21,12 @@ interface CreateBody {
   powerWatts?: number;
   connector?: string;
   baseStatus?: "available" | "maintenance" | "offline";
+  deviceModel?: "core" | "plus";
+  installType?: "car" | "mall" | "retail" | "outdoor" | "highway" | "office";
+  city?: string;
+  state?: string;
+  lat?: number;
+  lng?: number;
 }
 
 export async function POST(req: Request) {
@@ -41,6 +47,12 @@ export async function POST(req: Request) {
     powerWatts: body.powerWatts ?? 30,
     connector: body.connector ?? "USB-C",
     baseStatus: body.baseStatus ?? "available",
+    deviceModel: body.deviceModel ?? "core",
+    installType: body.installType ?? "office",
+    city: body.city ?? "",
+    state: body.state ?? "",
+    lat: body.lat ?? 0,
+    lng: body.lng ?? 0,
   });
   return jsonOk({ ...station, liveStatus: computeAdminStationStatus(station) }, { status: 201 });
 }

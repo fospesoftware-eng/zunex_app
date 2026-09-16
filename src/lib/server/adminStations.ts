@@ -4,8 +4,9 @@
 // getStation() in stations.ts still works for original stations; this module
 // returns the superset (seeded + admin-created).
 
-import { getStation, hasActiveSessionForStation } from "@/lib/server/stations";
+import { getStation, hasActiveSessionForStation, getAllStationConfigs } from "@/lib/server/stations";
 import { store } from "@/lib/server/store";
+import type { DeviceModel, InstallType } from "@/lib/core/types";
 
 export interface AdminStation {
   id: string;
@@ -17,6 +18,12 @@ export interface AdminStation {
   /** Manual admin status override — null means auto-compute. */
   forceStatus: "available" | "offline" | "busy" | null;
   createdAt: number;
+  deviceModel: DeviceModel;
+  installType: InstallType;
+  city: string;
+  state: string;
+  lat: number;
+  lng: number;
 }
 
 interface AdminStationRegistry {
@@ -33,23 +40,25 @@ let seeded = false;
 function seedFromBuiltin(): void {
   if (seeded) return;
   seeded = true;
-  const builtinIds = ["ZNX-A1", "ZNX-B2", "ZNX-L1", "ZNX-TEST"];
-  for (const id of builtinIds) {
-    if (!registry.stations.has(id)) {
-      // getStation needs a scenario; use default.
-      const result = getStation(id, "default");
-      if ("station" in result) {
-        registry.stations.set(id, {
-          id: result.station.id,
-          name: result.station.name,
-          location: result.station.location,
-          powerWatts: result.station.powerWatts,
-          connector: result.station.connector,
-          baseStatus: "available",
-          forceStatus: null,
-          createdAt: Date.now(),
-        });
-      }
+  const configs = getAllStationConfigs();
+  for (const config of configs) {
+    if (!registry.stations.has(config.id)) {
+      registry.stations.set(config.id, {
+        id: config.id,
+        name: config.name,
+        location: config.location,
+        powerWatts: config.powerWatts,
+        connector: config.connector,
+        baseStatus: config.baseStatus === "offline" ? "offline" : "available",
+        forceStatus: null,
+        createdAt: Date.now(),
+        deviceModel: config.deviceModel,
+        installType: config.installType,
+        city: config.city,
+        state: config.state,
+        lat: config.lat,
+        lng: config.lng,
+      });
     }
   }
 }
