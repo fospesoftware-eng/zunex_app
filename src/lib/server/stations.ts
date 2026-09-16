@@ -1,10 +1,12 @@
 import type { Station, StationStatus, DeviceModel, InstallType } from "@/lib/core/types";
 import { PLANS, store, type SessionRecord } from "@/lib/server/store";
 import { sessionService } from "@/lib/server/sessionService";
+import { getServerSupabase } from "@/lib/server/supabase";
 
 // ---------------------------------------------------------------------------
-// Station registry. In production this becomes a DB/API backed adapter.
-// `status` is computed per request so a busy port is reflected live.
+// Station registry — Supabase LiveDB (primary), STATION_CONFIGS (fallback).
+// Status is computed per request so a busy port / maintenance override / MQTT
+// heartbeat shows live.
 // ---------------------------------------------------------------------------
 
 interface StationConfig {
@@ -22,6 +24,9 @@ interface StationConfig {
   lng: number;
 }
 
+// Hard-coded seed — used when Supabase is unavailable OR as an in-memory
+// authoritative cache on this node (faster and immune to publishable-key RLS
+// blocks on writes — stations are read-only from client code anyway).
 const STATION_CONFIGS: StationConfig[] = [
   { id: "ZNX-A1", name: "Zunex Gateway", location: "Gateway Mall — Level 2", powerWatts: 45, connector: "USB-C", baseStatus: "available", deviceModel: "plus", installType: "mall", city: "Mumbai", state: "Maharashtra", lat: 19.0760, lng: 72.8777 },
   { id: "ZNX-A2", name: "Zunex BKC Hub", location: "Bandra Kurla Complex", powerWatts: 45, connector: "USB-C", baseStatus: "available", deviceModel: "plus", installType: "office", city: "Mumbai", state: "Maharashtra", lat: 19.0596, lng: 72.8425 },
@@ -40,6 +45,71 @@ const STATION_CONFIGS: StationConfig[] = [
   { id: "ZNX-J1", name: "ZUNEX J1", location: "Cuffe Parade Outpost", powerWatts: 30, connector: "USB-C", baseStatus: "available", deviceModel: "core", installType: "outdoor", city: "Jaipur", state: "Rajasthan", lat: 26.9124, lng: 75.7873 },
 ];
 
+// --- DB-backed refresh -----------------------------------------------------
+
+let dbCache: StationConfig[] | null = null;
+let dbCacheAt = 0;
+const DB_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes — stations change rarely
+
+interface DbStation {
+  id: string;
+  name: string;
+  location: string | null;
+  power_watts: number;
+  connector: string;
+  base_status: string;
+  force_status: string | null;
+  device_model: DeviceModel;
+  install_type: InstallType;
+  city: string | null;
+  state: string | null;
+  lat: number;
+  lng: number;
+}
+
+async function refreshDbCache(): Promise<void> {
+  const supabase = getServerSupabase();
+  if (!supabase) return;
+  try {
+    const { data, error } = await supabase
+      .from("stations")
+      .select("*")
+      .limit(200);
+    if (error) {
+      console.warn("[stations] db fetch error:", error.message);
+      return;
+    }
+    if (Array.isArray(data) && data.length > 0) {
+      dbCache = data.map((d: DbStation) => ({
+        id: d.id,
+        name: d.name,
+        location: d.location ?? "",
+        powerWatts: d.power_watts ?? 45,
+        connector: d.connector ?? "USB-C",
+        baseStatus: (d.force_status ?? d.base_status ?? "available") as Exclude<StationStatus, "busy">,
+        deviceModel: (d.device_model ?? "plus") as DeviceModel,
+        installType: (d.install_type ?? "mall") as InstallType,
+        city: d.city ?? "",
+        state: d.state ?? "",
+        lat: Number(d.lat),
+        lng: Number(d.lng),
+      }));
+      dbCacheAt = Date.now();
+    }
+  } catch (e) {
+    console.warn("[stations] db exception:", (e as Error).message);
+  }
+}
+
+function getConfigs(): StationConfig[] {
+  if (dbCache && Date.now() - dbCacheAt < DB_CACHE_TTL_MS) return dbCache;
+  // Fire refresh in background (do not await)
+  void refreshDbCache();
+  return dbCache ?? STATION_CONFIGS;
+}
+
+// --- Status computation ----------------------------------------------------
+
 const ACTIVE_STATES = new Set([
   "payment_successful",
   "starting",
@@ -57,14 +127,15 @@ function computeStatus(config: StationConfig, scenario: string): StationStatus {
   return "available";
 }
 
+// --- Public API ------------------------------------------------------------
+
 export function getStation(
   stationId: string,
   scenario: string,
 ): { station: Station } | { error: "not_found" } {
-  const config = STATION_CONFIGS.find((s) => s.id === stationId.toUpperCase());
+  const configs = getConfigs();
+  const config = configs.find((s) => s.id === stationId.toUpperCase());
   if (!config) return { error: "not_found" };
-  // Finalize any finished/abandoned sessions before reporting occupancy so a
-  // charge whose client went away frees the port without a server restart.
   sessionService.reap();
   const status = computeStatus(config, scenario);
   const station: Station = {
@@ -101,5 +172,10 @@ export function findSessionByPlan(stationId: string, planId: string): SessionRec
 }
 
 export function getAllStationConfigs(): StationConfig[] {
-  return STATION_CONFIGS.map((c) => ({ ...c }));
+  return getConfigs().map((c) => ({ ...c }));
+}
+
+/** Exposed for tests / warmup — called once from src/app/api/init/route.ts. */
+export function primeDbCache(): void {
+  void refreshDbCache();
 }

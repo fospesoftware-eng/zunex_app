@@ -14,6 +14,7 @@ import {
   sweepStore,
   type SessionRecord,
 } from "@/lib/server/store";
+import { syncSessionToDb } from "@/lib/server/dbSync";
 
 // ---------------------------------------------------------------------------
 // Session service — the stateful orchestrator. Every mutation goes through
@@ -45,6 +46,7 @@ function transition(
   s.state = to;
   s.updatedAt = Date.now();
   Object.assign(s, patch);
+  syncSessionToDb(s);
   return true;
 }
 
@@ -206,6 +208,7 @@ export const sessionService = {
     };
     store.sessions.set(session.id, session);
     if (input.idempotencyKey) store.idemIndex.set(input.idempotencyKey, session.id);
+    syncSessionToDb(session);
     return { ok: true, session };
   },
 
@@ -358,6 +361,7 @@ export const sessionService = {
     s.stopRequested = true;
     s.startRequested = false;
     s.updatedAt = Date.now();
+    syncSessionToDb(s);
     return true;
   },
 
