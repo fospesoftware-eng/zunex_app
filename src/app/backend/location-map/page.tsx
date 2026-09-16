@@ -80,12 +80,11 @@ const FALLBACK: StationRow[] = [
   { id: "ZNX-J1", name: "ZUNEX J1", location: "Cuffe Parade Outpost", city: "Jaipur", state: "Rajasthan", lat: 26.9124, lng: 75.7873, deviceModel: "core", installType: "outdoor", liveStatus: "available", connectionStatus: "online", firmwareVersion: "v2.3.0", lastSeenAt: Date.now() - 2800 },
 ];
 
-type FilterKey = "all" | DeviceModel | InstallType;
-const FILTERS: FilterKey[] = ["all", "core", "plus", "car", "mall", "retail", "outdoor", "highway", "office"];
+const CITY_FILTERS = ["All", "Mumbai", "Bangalore", "Delhi", "Chennai", "Hyderabad", "Kolkata", "Ahmedabad", "Jaipur"];
 
 export default function LocationMapPage() {
   const [stations, setStations] = useState<StationRow[]>(FALLBACK);
-  const [filter, setFilter] = useState<FilterKey[]>(["all"]);
+  const [cityFilter, setCityFilter] = useState<string>("All");
 
   const load = async () => {
     try {
@@ -131,9 +130,9 @@ export default function LocationMapPage() {
   useEffect(() => { load(); }, []);
 
   const filtered = useMemo(() => {
-    if (filter.includes("all")) return stations;
-    return stations.filter((s) => filter.includes(s.deviceModel as FilterKey) || filter.includes(s.installType as FilterKey));
-  }, [stations, filter]);
+    if (cityFilter === "All") return stations;
+    return stations.filter((s) => s.city === cityFilter);
+  }, [stations, cityFilter]);
 
   const mapPins: StationMapPoint[] = useMemo(() => filtered.map((s) => {
     const { x, y } = gpsToSvg(s.lat, s.lng);
@@ -155,16 +154,8 @@ export default function LocationMapPage() {
     return { total: stations.length, online, busy, offline };
   }, [stations]);
 
-  function toggleFilter(k: FilterKey) {
-    if (k === "all") { setFilter(["all"]); return; }
-    setFilter((prev) => {
-      const withoutAll = prev.filter((p) => p !== "all");
-      if (withoutAll.includes(k)) {
-        const next = withoutAll.filter((p) => p !== k);
-        return next.length ? next : ["all"];
-      }
-      return [...withoutAll, k];
-    });
+  function toggleCity(city: string) {
+    setCityFilter(city);
   }
 
   const sortedStations = useMemo(() => {
@@ -179,22 +170,22 @@ export default function LocationMapPage() {
         subtitle="Every ZUNEX station across India — live status and hardware configuration."
       />
 
-      {/* Filter pills */}
+      {/* City filter chips */}
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs uppercase tracking-wider text-paper-dim mr-2">Filter:</span>
-        {FILTERS.map((f) => {
-          const active = f === "all" ? filter.includes("all") : filter.includes(f);
+        <span className="text-xs uppercase tracking-wider text-paper-dim mr-2">Cities:</span>
+        {CITY_FILTERS.map((city) => {
+          const active = cityFilter === city;
           return (
             <button
-              key={f}
-              onClick={() => toggleFilter(f)}
+              key={city}
+              onClick={() => toggleCity(city)}
               className={`px-3 py-1 rounded-full text-xs font-medium border transition-all ${
                 active
                   ? "bg-[#4a63ff]/20 border-[#4a63ff]/50 text-[#a9bcff]"
                   : "bg-white/[0.03] border-white/10 text-paper-dim hover:text-white hover:bg-white/[0.06]"
               }`}
             >
-              {f.charAt(0).toUpperCase() + f.slice(1)}
+              {city}
             </button>
           );
         })}
