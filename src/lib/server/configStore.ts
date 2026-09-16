@@ -8,6 +8,9 @@
 
 import { writeFileSync, readFileSync, mkdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
+// Ensure the simulated heartbeat scheduler is alive whenever any server
+// module imports configStore. Guarded against HMR duplicates inside the file.
+import "./heartbeat";
 
 export interface AdminSettings {
   brandName: string;

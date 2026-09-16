@@ -1,0 +1,58 @@
+[
+  {
+    "id": "tk_seed_a",
+    "subject": "ZNX-A1 charging port not detecting device",
+    "description": "Station at Prestige Tech Park Level 2 stopped accepting devices after the overnight firmware push.",
+    "priority": "critical",
+    "status": "open",
+    "requesterName": "Priya Menon",
+    "requesterEmail": "priya@prestigetp.example",
+    "stationId": "ZNX-A1",
+    "assignee": null,
+    "createdAt": 1789523293073,
+    "updatedAt": 1789523293073,
+    "closedAt": null
+  },
+  {
+    "id": "tk_seed_b",
+    "subject": "Billing discrepancy — double charged",
+    "description": "Customer was billed twice for the same 25-minute session on ZNX-B2.",
+    "priority": "high",
+    "status": "open",
+    "requesterName": "Karthik Iyer",
+    "requesterEmail": "karthik.iyer@example.com",
+    "stationId": "ZNX-B2",
+    "assignee": null,
+    "createdAt": 1789512493073,
+    "updatedAt": 1789516093073,
+    "closedAt": null
+  },
+  {
+    "id": "tk_seed_c",
+    "subject": "MQTT broker flapping — ZNX-L1 offline intermittently",
+    "description": "Telemetry shows L1 going offline every ~30 minutes for the past hour. Broker logs suggest a keepalive race.",
+    "priority": "medium",
+    "status": "in_progress",
+    "requesterName": "Ops Team",
+    "requesterEmail": "ops@zunexglobal.com",
+    "stationId": "ZNX-L1",
+    "assignee": "admin@zunexglobal.com",
+    "createdAt": 1789498093073,
+    "updatedAt": 1789526893073,
+    "closedAt": null
+  },
+  {
+    "id": "tk_seed_d",
+    "subject": "Welcome screen typo on Chinese locale",
+    "description": "Minor text fix — already merged, waiting release.",
+    "priority": "low",
+    "status": "resolved",
+    "requesterName": "Lin Wei",
+    "requesterEmail": "lin.wei@example.com",
+    "stationId": null,
+    "assignee": "admin@zunexglobal.com",
+    "createdAt": 1789357693073,
+    "updatedAt": 1789444093073,
+    "closedAt": null
+  }
+]
