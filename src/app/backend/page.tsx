@@ -16,22 +16,24 @@ export default function AdminRootPage() {
   const [token, setTokenLocal] = useState("");
   const [error, setError] = useState<string | null>(null);
 
+  const inDev = process.env.NODE_ENV === "development";
+  const hasEnvToken = !!process.env.NEXT_PUBLIC_ZUNEX_ADMIN_TOKEN || !!process.env.ZUNEX_ADMIN_TOKEN;
+
+  // If no token at all (dev, no env var), skip the gate entirely — but do
+  // it in an effect, never during render (React 16+ forbids updating
+  // Router from another component's render phase).
+  useEffect(() => {
+    if (!inDev || hasEnvToken) return;
+    // Dev + no token set → bounce straight to dashboard
+    router.replace("/backend/dashboard");
+  }, [inDev, hasEnvToken, router]);
+
+  // Also redirect when already authenticated.
   useEffect(() => {
     if (!isLoading && authenticated) {
       router.replace("/backend/dashboard");
     }
   }, [authenticated, isLoading, router]);
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-[#0b1024] flex items-center justify-center">
-        <div className="text-paper-dim text-sm">Loading…</div>
-      </div>
-    );
-  }
-
-  const inDev = process.env.NODE_ENV === "development";
-  const hasEnvToken = !!process.env.NEXT_PUBLIC_ZUNEX_ADMIN_TOKEN || !!process.env.ZUNEX_ADMIN_TOKEN;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,10 +47,21 @@ export default function AdminRootPage() {
     router.replace("/backend/dashboard");
   };
 
-  // If no token at all (dev, no env var), skip the gate entirely.
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-[#0b1024] flex items-center justify-center">
+        <div className="text-paper-dim text-sm">Loading…</div>
+      </div>
+    );
+  }
+
+  // If no token in dev + already handled by effect above, show loading.
   if (inDev && !hasEnvToken) {
-    router.replace("/backend/dashboard");
-    return null;
+    return (
+      <div className="min-h-screen bg-[#0b1024] flex items-center justify-center">
+        <div className="text-paper-dim text-sm">Redirecting…</div>
+      </div>
+    );
   }
 
   return (
