@@ -130,43 +130,14 @@ export function Sidebar({ open, onClose }: Props) {
         initial={false}
         animate={asideAnimate}
         transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-        className="fixed top-0 left-0 bottom-0 w-64 z-40 lg:translate-x-0 flex flex-col border-r border-white/5"
+        className="fixed top-[64px] left-0 bottom-0 w-64 z-30 lg:translate-x-0 flex flex-col border-r border-white/5"
         style={{
-          background: "linear-gradient(180deg, #0b1024 0%, #0d1430 100%)",
+          background: "linear-gradient(180deg, rgba(11,16,36,0.92) 0%, rgba(13,20,48,0.92) 100%)",
           backdropFilter: "blur(24px)",
         }}
       >
-        {/* Brand header — generous vertical padding */}
-        <div className="relative pt-6 pb-5 px-5 overflow-hidden">
-          {/* Navy glow blob for depth */}
-          <div className="absolute -top-8 -left-4 w-44 h-44 rounded-full bg-[#2447ff]/18 blur-[48px] pointer-events-none" />
-          <div className="absolute -bottom-6 -right-2 w-28 h-28 rounded-full bg-[#4a63ff]/12 blur-[36px] pointer-events-none" />
-
-          <Link href="/backend/dashboard" className="relative flex items-center gap-3 z-10">
-            {/* ZUNEX symbol */}
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/brand/zunex-symbol.svg"
-              alt="ZUNEX"
-              className="w-9 h-9 rounded-md shadow-[0_4px_18px_-4px_rgba(36,71,255,0.6)]"
-              draggable={false}
-            />
-
-            {/* Wordmark + label */}
-            <div className="flex flex-col justify-center">
-              <BrandWordmark className="h-5" />
-              <span className="text-[10px] font-medium tracking-wider text-paper-dim/70 mt-0.5">
-                Admin Console · v1.0
-              </span>
-            </div>
-          </Link>
-        </div>
-
-        {/* Soft divider */}
-        <div className="mx-5 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent mb-4" />
-
         {/* Nav — themed scrollbar */}
-        <nav className="zunex-nav-scroll flex-1 px-3 pb-4 overflow-y-auto space-y-6">
+        <nav className="zunex-nav-scroll flex-1 pt-4 px-3 pb-4 overflow-y-auto space-y-6">
           {NAV_GROUPS.map((group) => (
             <div key={group.label} className="space-y-1">
               <div className="px-3 mb-2 text-[10px] font-semibold tracking-[0.18em] text-paper-dim/50">

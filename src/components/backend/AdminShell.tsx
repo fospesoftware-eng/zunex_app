@@ -39,11 +39,13 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
         </div>
 
         <Sidebar open={mobileOpen} onClose={() => setMobileOpen(false)} />
-        <div className="lg:pl-64 relative z-10">
+
+        {/* Main column — fixed header lives above; content sits below with 64px top padding */}
+        <div className="lg:pl-64 relative z-10 pt-[64px]">
           <TopBar onMenuClick={() => setMobileOpen(true)} />
 
           {/* Main content with ambient glow blobs */}
-          <main className="relative p-4 sm:p-6 lg:p-8 max-w-[1400px] min-h-[calc(100vh-56px)]">
+          <main className="relative p-4 sm:p-6 lg:p-8 max-w-[1400px] min-h-[calc(100vh-64px)]">
             {/* Ambient glow blobs behind content */}
             <div
               className="absolute top-[20%] left-[15%] w-[400px] h-[400px] rounded-full opacity-30 pointer-events-none z-0"
