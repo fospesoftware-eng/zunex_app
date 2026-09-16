@@ -1,0 +1,79 @@
+{
+  "settings": {
+    "brandName": "ZUNEX",
+    "tagline": "Charge forward.",
+    "supportEmail": "support@zunexglobal.com",
+    "commissionRatePct": 20,
+    "defaultPowerWatts": 30,
+    "maintenanceStations": [],
+    "commonConfig": {
+      "maxSessionsPerStation": 1,
+      "sessionGraceMinutes": 2
+    }
+  },
+  "strategies": [
+    {
+      "id": "strat_09521000",
+      "timeSlot": "09:52-10:00",
+      "deviceRatioPct": 30,
+      "enabled": true,
+      "createdAt": 1789529835200
+    },
+    {
+      "id": "strat_15531610",
+      "timeSlot": "15:53-16:10",
+      "deviceRatioPct": 45,
+      "enabled": true,
+      "createdAt": 1789529835200
+    },
+    {
+      "id": "strat_18072124",
+      "timeSlot": "18:07-21:24",
+      "deviceRatioPct": 60,
+      "enabled": true,
+      "createdAt": 1789529835200
+    },
+    {
+      "id": "strat_21032354",
+      "timeSlot": "21:03-23:54",
+      "deviceRatioPct": 25,
+      "enabled": true,
+      "createdAt": 1789529835200
+    }
+  ],
+  "partners": [
+    {
+      "id": "partner_001",
+      "name": "Prestige Tech Park",
+      "type": "enterprise",
+      "contactName": "Priya Menon",
+      "contactEmail": "priya@prestigetp.example",
+      "stationsOwned": 12,
+      "commissionRatePct": 18,
+      "active": true,
+      "joinedAt": 1789529835200
+    },
+    {
+      "id": "partner_002",
+      "name": "Urban Charge Hub",
+      "type": "merchant",
+      "contactName": "Ravi Sharma",
+      "contactEmail": "ravi@urbancharge.example",
+      "stationsOwned": 8,
+      "commissionRatePct": 22,
+      "active": true,
+      "joinedAt": 1789529835200
+    }
+  ],
+  "admins": [
+    {
+      "id": "adm_super",
+      "name": "ZUNEX Super Admin",
+      "email": "admin@zunexglobal.com",
+      "role": "super_admin",
+      "active": true,
+      "lastLoginAt": null
+    }
+  ],
+  "seedOverride": {}
+}
