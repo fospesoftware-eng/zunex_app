@@ -16,17 +16,16 @@ export default function AdminRootPage() {
   const [token, setTokenLocal] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  const inDev = process.env.NODE_ENV === "development";
   const hasEnvToken = !!process.env.NEXT_PUBLIC_ZUNEX_ADMIN_TOKEN || !!process.env.ZUNEX_ADMIN_TOKEN;
 
-  // If no token at all (dev, no env var), skip the gate entirely — but do
-  // it in an effect, never during render (React 16+ forbids updating
-  // Router from another component's render phase).
+  // If no token configured at all (open mode — works in dev AND prod), skip
+  // the gate entirely and go straight to dashboard. Done in an effect to
+  // avoid the "update Router during render" React error.
   useEffect(() => {
-    if (!inDev || hasEnvToken) return;
-    // Dev + no token set → bounce straight to dashboard
+    if (hasEnvToken) return; // token IS configured → gate applies
+    // No token set anywhere → open mode, bounce straight to dashboard
     router.replace("/backend/dashboard");
-  }, [inDev, hasEnvToken, router]);
+  }, [hasEnvToken, router]);
 
   // Also redirect when already authenticated.
   useEffect(() => {
@@ -55,8 +54,8 @@ export default function AdminRootPage() {
     );
   }
 
-  // If no token in dev + already handled by effect above, show loading.
-  if (inDev && !hasEnvToken) {
+  // If no token configured at all + already handled by effect above, show loading.
+  if (!hasEnvToken) {
     return (
       <div className="min-h-screen bg-[#0b1024] flex items-center justify-center">
         <div className="text-paper-dim text-sm">Redirecting…</div>
@@ -135,7 +134,7 @@ export default function AdminRootPage() {
 
         <div className="mt-6 pt-4 border-t border-white/10 flex items-center gap-2 text-[11px] text-paper-dim">
           <Zap size={12} />
-          <span>{inDev ? "Development access enabled" : "Production — token required"}</span>
+          <span>Token-gated · open mode when no env var set</span>
         </div>
       </motion.div>
     </div>
