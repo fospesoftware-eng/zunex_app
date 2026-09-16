@@ -143,12 +143,12 @@ export function Sidebar({ open, onClose }: Props) {
           <div className="absolute -bottom-4 -right-4 w-32 h-32 rounded-full bg-[#4a63ff]/15 blur-[40px] pointer-events-none" />
 
           <Link href="/backend/dashboard" className="relative flex items-center gap-3 z-10">
-            {/* Actual ZUNEX logo artwork (blue rounded square with white C→arrow monogram) */}
+            {/* ZUNEX symbol — same svg as top-right logout button (white rounded square with dark glyph) */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="/brand/zunex-mark.png"
+              src="/brand/zunex-symbol.svg"
               alt="ZUNEX"
-              className="w-9 h-9 rounded-[26.8%] shadow-[0_6px_22px_-6px_rgba(36,71,255,0.7)]"
+              className="w-9 h-9 rounded-md shadow-[0_4px_18px_-4px_rgba(36,71,255,0.6)]"
               draggable={false}
             />
 
