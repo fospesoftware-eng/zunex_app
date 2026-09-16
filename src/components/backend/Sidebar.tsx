@@ -136,14 +136,14 @@ export function Sidebar({ open, onClose }: Props) {
           backdropFilter: "blur(24px)",
         }}
       >
-        {/* Brand header — 128px tall */}
-        <div className="relative h-[128px] flex items-center px-5 overflow-hidden">
+        {/* Brand header — generous vertical padding */}
+        <div className="relative pt-6 pb-5 px-5 overflow-hidden">
           {/* Navy glow blob for depth */}
-          <div className="absolute -top-10 -left-6 w-48 h-48 rounded-full bg-[#2447ff]/20 blur-[50px] pointer-events-none" />
-          <div className="absolute -bottom-4 -right-4 w-32 h-32 rounded-full bg-[#4a63ff]/15 blur-[40px] pointer-events-none" />
+          <div className="absolute -top-8 -left-4 w-44 h-44 rounded-full bg-[#2447ff]/18 blur-[48px] pointer-events-none" />
+          <div className="absolute -bottom-6 -right-2 w-28 h-28 rounded-full bg-[#4a63ff]/12 blur-[36px] pointer-events-none" />
 
           <Link href="/backend/dashboard" className="relative flex items-center gap-3 z-10">
-            {/* ZUNEX symbol — same svg as top-right logout button (white rounded square with dark glyph) */}
+            {/* ZUNEX symbol */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/brand/zunex-symbol.svg"
@@ -163,10 +163,10 @@ export function Sidebar({ open, onClose }: Props) {
         </div>
 
         {/* Soft divider */}
-        <div className="mx-5 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent mb-6" />
+        <div className="mx-5 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent mb-4" />
 
-        {/* Nav */}
-        <nav className="flex-1 px-3 pb-4 overflow-y-auto space-y-6">
+        {/* Nav — themed scrollbar */}
+        <nav className="zunex-nav-scroll flex-1 px-3 pb-4 overflow-y-auto space-y-6">
           {NAV_GROUPS.map((group) => (
             <div key={group.label} className="space-y-1">
               <div className="px-3 mb-2 text-[10px] font-semibold tracking-[0.18em] text-paper-dim/50">

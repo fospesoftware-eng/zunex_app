@@ -1307,6 +1307,31 @@ button {
 }
 
 /* ---------------------------------------------------------------------------
+   ZUNEX premium scrollbar — navy theme with blue accent thumb
+--------------------------------------------------------------------------- */
+.zunex-nav-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(74, 99, 255, 0.45) transparent;
+}
+.zunex-nav-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+.zunex-nav-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.zunex-nav-scroll::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(74, 99, 255, 0.55), rgba(36, 71, 255, 0.35));
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+}
+.zunex-nav-scroll::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, rgba(122, 145, 255, 0.75), rgba(36, 71, 255, 0.55));
+}
+.zunex-nav-scroll::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* ---------------------------------------------------------------------------
    Quick actions — WiFi · Free charge, a quiet pair at the welcome's base
 --------------------------------------------------------------------------- */
 

@@ -12,7 +12,6 @@ import {
   Shield,
   Settings,
 } from "lucide-react";
-import { BrandWordmark } from "@/components/brand/Logo";
 
 interface Props {
   onMenuClick: () => void;
@@ -121,14 +120,14 @@ export function TopBar({ onMenuClick }: Props) {
           <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#ff6a4d] shadow-[0_0_8px_rgba(255,106,77,0.8)]" />
         </button>
 
-        {/* ZUNEX symbol dropdown — logout button */}
+        {/* ZUNEX symbol dropdown — logout button (symbol only) */}
         <div ref={menuRef} className="relative">
           <button
             onClick={() => setMenuOpen((o) => !o)}
-            className="flex items-center gap-1.5 h-9 pl-1 pr-2 rounded-lg bg-white/[0.04] border border-white/10 hover:bg-white/[0.07] hover:border-white/20 transition group"
+            className="flex items-center gap-1.5 h-9 px-1.5 rounded-lg bg-white/[0.04] border border-white/10 hover:bg-white/[0.07] hover:border-white/20 transition group"
             aria-label="Account menu"
           >
-            {/* ZUNEX symbol svg — white rounded square with dark blue C→arrow, sized to be readable */}
+            {/* ZUNEX symbol svg only — no wordmark */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/brand/zunex-symbol.svg"
@@ -136,9 +135,6 @@ export function TopBar({ onMenuClick }: Props) {
               className="h-7 w-7 rounded-md shadow-[0_2px_10px_-2px_rgba(36,71,255,0.5)]"
               draggable={false}
             />
-            <span className="hidden sm:block">
-              <BrandWordmark className="h-4" />
-            </span>
             <ChevronDown
               size={14}
               className={`text-paper-dim transition-transform duration-200 ${menuOpen ? "rotate-180" : ""}`}
