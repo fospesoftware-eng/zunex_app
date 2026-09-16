@@ -143,13 +143,14 @@ export function Sidebar({ open, onClose }: Props) {
           <div className="absolute -bottom-4 -right-4 w-32 h-32 rounded-full bg-[#4a63ff]/15 blur-[40px] pointer-events-none" />
 
           <Link href="/backend/dashboard" className="relative flex items-center gap-3 z-10">
-            {/* 32px circular ZUNEX monogram with radial glow */}
-            <div className="relative w-8 h-8">
-              <div className="absolute inset-0 rounded-full bg-[radial-gradient(circle,rgba(36,71,255,0.3),transparent_70%)]" />
-              <div className="relative w-8 h-8 rounded-[26.8%] overflow-hidden bg-gradient-to-br from-[#1a2366] to-[#0b1430] border border-white/15 shadow-[0_4px_18px_-4px_rgba(36,71,255,0.6)]">
-                <BrandSymbol className="h-7 w-7" />
-              </div>
-            </div>
+            {/* Actual ZUNEX logo artwork (blue rounded square with white C→arrow monogram) */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/brand/zunex-mark.png"
+              alt="ZUNEX"
+              className="w-9 h-9 rounded-[26.8%] shadow-[0_6px_22px_-6px_rgba(36,71,255,0.7)]"
+              draggable={false}
+            />
 
             {/* Wordmark + label */}
             <div className="flex flex-col justify-center">

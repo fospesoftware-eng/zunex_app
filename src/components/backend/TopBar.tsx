@@ -8,7 +8,6 @@ import {
   Search,
   Bell,
 } from "lucide-react";
-import { BrandSymbol } from "@/components/brand/Logo";
 
 interface Props {
   onMenuClick: () => void;
@@ -96,12 +95,14 @@ export function TopBar({ onMenuClick }: Props) {
           <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#ff6a4d] shadow-[0_0_8px_rgba(255,106,77,0.8)]" />
         </button>
 
-        {/* Profile avatar with ZUNEX monogram */}
-        <div className="h-9 w-9 rounded-[26.8%] overflow-hidden border border-white/15 bg-gradient-to-br from-[#1a2366] to-[#0b1430] shadow-[0_2px_12px_-4px_rgba(36,71,255,0.5)]">
-          <div className="w-full h-full flex items-center justify-center">
-            <BrandSymbol className="h-6 w-6" />
-          </div>
-        </div>
+        {/* Profile avatar — actual ZUNEX logo artwork */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/brand/zunex-mark.png"
+          alt="ZUNEX"
+          className="h-9 w-9 rounded-[26.8%] shadow-[0_2px_12px_-4px_rgba(36,71,255,0.5)]"
+          draggable={false}
+        />
       </div>
     </header>
   );
