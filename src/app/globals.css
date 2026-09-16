@@ -1,5 +1,15 @@
 @import "tailwindcss";
 
+/* Font CSS vars — next/font/google was replaced with <link> tags to work
+   around the Next.js 16 Turbopack bug (can't resolve @vercel/turbopack-next/...
+   internal font module). We still declare the CSS vars so existing
+   var(--font-inter) / var(--font-space) fallbacks resolve cleanly. */
+:root {
+  --font-inter: "Inter", system-ui, -apple-system, sans-serif;
+  --font-space: "Space Grotesk", system-ui, -apple-system, sans-serif;
+  --font-display: "Space Grotesk", system-ui, -apple-system, sans-serif;
+}
+
 /* ---------------------------------------------------------------------------
    ZUNEX design tokens — "Ink · Paper · Signal" with an Amber energy accent.
    Dark, luxurious, glass-and-light. Nothing neon, nothing gamer.

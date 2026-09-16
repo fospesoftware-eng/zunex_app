@@ -1,18 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, Space_Grotesk } from "next/font/google";
 import "./globals.css";
-
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-inter",
-  display: "swap",
-});
-
-const spaceGrotesk = Space_Grotesk({
-  subsets: ["latin"],
-  variable: "--font-space",
-  display: "swap",
-});
 
 export const metadata: Metadata = {
   title: "ZUNEX · Charge",
@@ -56,7 +43,21 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={`${inter.variable} ${spaceGrotesk.variable}`}>
+    <html lang="en" className="font-inter">
+      <head>
+        {/* Google Fonts — Inter + Space Grotesk (next/font/google breaks on
+            Next.js 16 Turbopack with "can't resolve @vercel/turbopack-next/..."
+            so we use the stable <link> approach instead). */}
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap"
+          rel="stylesheet"
+        />
+        {/* CSS custom properties so existing `--font-inter` / `--font-space`
+            variables still resolve (globals.css already sets them, but re-
+            declaring here is harmless). */}
+      </head>
       <body>{children}</body>
     </html>
   );
