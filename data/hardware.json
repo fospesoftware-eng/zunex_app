@@ -10,10 +10,10 @@
     "password": "dev_znx-a1",
     "firmwareVersion": "v2.0.4",
     "heartbeatIntervalMs": 30000,
-    "lastSeenAt": 1789530498018,
+    "lastSeenAt": 1789531411020,
     "connectionStatus": "online",
     "telemetryEnabled": true,
-    "updatedAt": 1789530585920
+    "updatedAt": 1789531411020
   },
   {
     "id": "hw_ZNX-B2",
@@ -26,10 +26,10 @@
     "password": "dev_znx-b2",
     "firmwareVersion": "v2.1.4",
     "heartbeatIntervalMs": 30000,
-    "lastSeenAt": 1789530585920,
+    "lastSeenAt": 1789531396019,
     "connectionStatus": "online",
     "telemetryEnabled": true,
-    "updatedAt": 1789530585920
+    "updatedAt": 1789531411020
   },
   {
     "id": "hw_ZNX-L1",
@@ -42,10 +42,10 @@
     "password": "dev_znx-l1",
     "firmwareVersion": "v2.2.4",
     "heartbeatIntervalMs": 30000,
-    "lastSeenAt": 1789530585920,
+    "lastSeenAt": 1789531411020,
     "connectionStatus": "online",
     "telemetryEnabled": true,
-    "updatedAt": 1789530585920
+    "updatedAt": 1789531411020
   },
   {
     "id": "hw_ZNX-K3",
@@ -58,9 +58,9 @@
     "password": "dev_znx-k3",
     "firmwareVersion": "v2.3.4",
     "heartbeatIntervalMs": 30000,
-    "lastSeenAt": 1789530523289,
+    "lastSeenAt": 1789531396019,
     "connectionStatus": "offline",
     "telemetryEnabled": true,
-    "updatedAt": 1789530585920
+    "updatedAt": 1789531411020
   }
 ]
