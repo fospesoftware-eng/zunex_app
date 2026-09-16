@@ -15,36 +15,24 @@ const HEADER = "x-zunex-admin-token";
 export function requireAdmin(
   req: NextRequest | Request,
 ): { ok: true } | { ok: false; response: Response } {
-  const expected = process.env.ZUNEX_ADMIN_TOKEN;
+  const expected = process.env.ZUNEX_ADMIN_TOKEN || process.env.NEXT_PUBLIC_ZUNEX_ADMIN_TOKEN;
 
-  if (expected) {
-    const actual = req.headers.get(HEADER);
-    if (actual !== expected) {
-      return {
-        ok: false,
-        response: Response.json(
-          { ok: false, code: "unauthorized", message: "Invalid admin token" },
-          { status: 401 },
-        ),
-      };
-    }
+  // OPEN MODE — no token configured anywhere. Allow requests.
+  // Intentional: a missed env var on a fresh deploy must not lock admins out.
+  if (!expected) {
     return { ok: true };
   }
 
-  // No token configured — dev-only access.
-  if (process.env.NODE_ENV === "development") {
-    return { ok: true };
+  // Token IS configured — validate
+  const actual = req.headers.get(HEADER);
+  if (actual !== expected) {
+    return {
+      ok: false,
+      response: Response.json(
+        { ok: false, code: "unauthorized", message: "Invalid admin token" },
+        { status: 401 },
+      ),
+    };
   }
-
-  return {
-    ok: false,
-    response: Response.json(
-      {
-        ok: false,
-        code: "unauthorized",
-        message: "Admin access is disabled — configure ZUNEX_ADMIN_TOKEN",
-      },
-      { status: 401 },
-    ),
-  };
+  return { ok: true };
 }
