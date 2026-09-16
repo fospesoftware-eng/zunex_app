@@ -20,15 +20,24 @@ interface Props {
 }
 
 function formatTime(d: Date): string {
-  // Indian Standard Time (UTC+5:30)
-  const h = String(d.getHours() + 5).padStart(2, "0");
-  const m = String(d.getMinutes() + 30).padStart(2, "0");
-  const s = String(d.getSeconds()).padStart(2, "0");
-  // Carry hour overflow if needed
-  const carry = Number(m) >= 60 ? 1 : 0;
-  const finalH = ((Number(h) + carry) % 24).toString().padStart(2, "0");
-  const finalM = (Number(m) % 60).toString().padStart(2, "0");
-  return `${finalH}:${finalM}:${s}`;
+  // Use IANA timezone so the clock reads IST no matter where the admin
+  // actually sits (India, Europe, US — same output every time).
+  // Fallback to simple local time if Intl support is missing.
+  try {
+    return d.toLocaleTimeString("en-GB", {
+      timeZone: "Asia/Kolkata",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false,
+    });
+  } catch {
+    // Safeguard for older runtimes that lack Intl timezones
+    const h = String(d.getHours()).padStart(2, "0");
+    const m = String(d.getMinutes()).padStart(2, "0");
+    const s = String(d.getSeconds()).padStart(2, "0");
+    return `${h}:${m}:${s}`;
+  }
 }
 
 export function TopBar({ onMenuClick }: Props) {
