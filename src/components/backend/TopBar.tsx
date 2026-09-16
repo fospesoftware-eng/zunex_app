@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { usePathname } from "next/navigation";
 import Link from "next/link";
 import {
   Menu,
@@ -12,11 +11,6 @@ import {
   ChevronDown,
   Shield,
   Settings,
-  LayoutDashboard,
-  Cpu,
-  Wifi,
-  MapPin,
-  Activity,
   Zap,
 } from "lucide-react";
 import { BrandWordmark } from "@/components/brand/Logo";
@@ -32,17 +26,7 @@ function formatTime(d: Date): string {
   return `${h}:${m}:${s}`;
 }
 
-// Key shortcuts shown in the frozen header — always visible, even on scroll
-const SHORTCUTS = [
-  { href: "/backend/dashboard", label: "Dashboard", Icon: LayoutDashboard },
-  { href: "/backend/stations", label: "Stations", Icon: Cpu },
-  { href: "/backend/hardware", label: "Hardware", Icon: Wifi },
-  { href: "/backend/location-map", label: "Map", Icon: MapPin },
-  { href: "/backend/sessions", label: "Sessions", Icon: Activity },
-] as const;
-
 export function TopBar({ onMenuClick }: Props) {
-  const pathname = usePathname();
   const [now, setNow] = useState(new Date());
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -68,12 +52,6 @@ export function TopBar({ onMenuClick }: Props) {
     window.location.href = "/backend";
   };
 
-  // Which shortcut is active (for the blue accent state)
-  function isShortcutActive(href: string) {
-    if (href === "/backend/dashboard") return pathname === "/backend/dashboard" || pathname === "/backend";
-    return pathname?.startsWith(href);
-  }
-
   return (
     <header
       className="fixed top-0 left-0 right-0 z-50 h-[64px] border-b border-white/5"
@@ -82,18 +60,20 @@ export function TopBar({ onMenuClick }: Props) {
         backdropFilter: "blur(22px) saturate(140%)",
       }}
     >
-      <div className="h-full flex items-center gap-3 sm:gap-5 px-4 sm:px-6 lg:pl-72">
-        {/* Mobile menu — only shows below lg (since sidebar hides on mobile) */}
-        <button
-          onClick={onMenuClick}
-          className="lg:hidden p-2 rounded-lg text-paper-dim hover:text-paper hover:bg-white/5 transition"
-          aria-label="Open menu"
-        >
-          <Menu size={20} />
-        </button>
+      <div className="h-full flex items-center px-4 sm:px-6">
 
-        {/* ================= LEFT — ZUNEX LOGO (always frozen) ================= */}
-        <Link href="/backend/dashboard" className="flex items-center gap-2.5 shrink-0">
+        {/* ====== LOGO — TOP-LEFT, pin to x=0 ====== */}
+        {/* No pl-64 padding here — sidebar sits below at top-[64px], header spans full width */}
+        <div className="flex items-center gap-2.5 shrink-0 pr-6">
+          {/* Mobile menu */}
+          <button
+            onClick={onMenuClick}
+            className="lg:hidden p-2 -ml-2 rounded-lg text-paper-dim hover:text-paper hover:bg-white/5 transition"
+            aria-label="Open menu"
+          >
+            <Menu size={20} />
+          </button>
+
           {/* ZUNEX symbol svg */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
@@ -103,58 +83,26 @@ export function TopBar({ onMenuClick }: Props) {
             draggable={false}
           />
           <BrandWordmark className="h-[18px]" />
-          <span className="hidden md:inline text-[10px] font-semibold tracking-wider text-[#a9bcff]/70 ml-1 border-l border-white/10 pl-2">
+          <span className="hidden md:inline text-[10px] font-semibold tracking-wider text-[#a9bcff]/70 border-l border-white/10 pl-2 ml-1">
             ADMIN · v1
           </span>
-        </Link>
 
-        {/* Soft vertical divider */}
-        <div className="hidden lg:block h-6 w-px bg-gradient-to-b from-transparent via-white/10 to-transparent" />
+          {/* Soft vertical divider next to logo — separates brand from utility zone */}
+          <div className="hidden lg:block h-6 w-px bg-gradient-to-b from-transparent via-white/10 to-transparent ml-2" />
+        </div>
 
-        {/* ================= CENTER — SHORTCUT MENUS (always frozen) ================= */}
-        <nav className="hidden lg:flex items-center gap-1 flex-1 min-w-0">
-          {SHORTCUTS.map(({ href, label, Icon }) => {
-            const active = isShortcutActive(href);
-            return (
-              <Link
-                key={href}
-                href={href}
-                className={`group relative flex items-center gap-1.5 h-9 px-3 rounded-lg text-[13px] font-medium transition-all duration-200 ${
-                  active
-                    ? "text-white bg-[rgba(36,71,255,0.14)] border border-[rgba(74,99,255,0.35)]"
-                    : "text-paper-dim hover:text-white hover:bg-white/[0.05] border border-transparent"
-                }`}
-              >
-                <Icon
-                  size={16}
-                  className={active ? "text-[#a9bcff]" : "text-paper-dim group-hover:text-white"}
-                />
-                <span>{label}</span>
-                {active && (
-                  <motion.div
-                    layoutId="header-shortcut-indicator"
-                    className="absolute -bottom-px left-1/2 -translate-x-1/2 w-6 h-0.5 rounded-b-full bg-gradient-to-r from-[#4a63ff] to-[#2447ff]"
-                    transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-                  />
-                )}
-              </Link>
-            );
-          })}
-        </nav>
-
-        {/* Spacer on lg so right zone doesn't crowd the shortcuts */}
-        <div className="hidden lg:block flex-1 max-w-md">
-          {/* Search — right of shortcuts on large screens */}
-          <div className="relative">
+        {/* ====== CENTER — SEARCH (flex-1, but doesn't overlap logo on left) ====== */}
+        <div className="flex-1 min-w-0 flex items-center gap-3">
+          <div className="hidden sm:block relative w-full max-w-md">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-paper-dim/70" />
             <input
-              placeholder="Search stations, sessions…"
+              placeholder="Search stations, sessions, plans…"
               className="w-full h-9 pl-9 pr-3 rounded-lg bg-white/[0.04] border border-white/10 text-sm text-paper placeholder:text-paper-dim/50 focus:outline-none focus:border-[#4a63ff]/60 focus:bg-white/[0.06] transition"
             />
           </div>
         </div>
 
-        {/* ================= RIGHT — LIVE, CLOCK, BELL, LOGOUT ================= */}
+        {/* ====== RIGHT — STATUS + LOGOUT ====== */}
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
           {/* Live indicator */}
           <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-[rgba(36,71,255,0.08)] border border-[rgba(74,99,255,0.22)]">
@@ -185,16 +133,16 @@ export function TopBar({ onMenuClick }: Props) {
             <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#ff6a4d] shadow-[0_0_8px_rgba(255,106,77,0.8)]" />
           </button>
 
-          {/* Quick action — Power (shortcut) */}
+          {/* Quick power shortcut */}
           <Link
             href="/backend/dashboard"
             className="hidden sm:flex items-center justify-center h-9 w-9 rounded-lg bg-white/[0.04] border border-white/10 text-paper-dim hover:text-white hover:bg-white/[0.07] transition"
-            aria-label="Power"
+            aria-label="Quick power"
           >
             <Zap size={16} />
           </Link>
 
-          {/* ZUNEX symbol dropdown — logout (symbol only) */}
+          {/* ZUNEX symbol — logout dropdown */}
           <div ref={menuRef} className="relative">
             <button
               onClick={() => setMenuOpen((o) => !o)}

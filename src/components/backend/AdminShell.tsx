@@ -40,9 +40,11 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
 
         <Sidebar open={mobileOpen} onClose={() => setMobileOpen(false)} />
 
-        {/* Main column — fixed header lives above; content sits below with 64px top padding */}
-        <div className="lg:pl-64 relative z-10 pt-[64px]">
-          <TopBar onMenuClick={() => setMobileOpen(true)} />
+        {/* TopBar — fixed, full width, sits above everything. NOT inside any pl-64 wrapper. */}
+        <TopBar onMenuClick={() => setMobileOpen(true)} />
+
+        {/* Main column — pushed below header (pt-[64px]) AND right of sidebar (lg:pl-64) */}
+        <div className="lg:pl-64 pt-[64px] relative z-10">
 
           {/* Main content with ambient glow blobs */}
           <main className="relative p-4 sm:p-6 lg:p-8 max-w-[1400px] min-h-[calc(100vh-64px)]">
