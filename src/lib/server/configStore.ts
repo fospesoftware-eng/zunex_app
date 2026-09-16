@@ -20,6 +20,21 @@ export interface AdminSettings {
   defaultPowerWatts: number;
   maintenanceStations: string[];
   commonConfig: Record<string, string | number | boolean>;
+  paymentGateways: PaymentGatewayConfig;
+}
+
+export interface PaymentGatewayConfig {
+  active: "cashfree" | "razorpay" | "none";
+  cashfree: {
+    appId: string;
+    secretKey: string;
+    sandbox: boolean;
+  };
+  razorpay: {
+    keyId: string;
+    keySecret: string;
+    sandbox: boolean;
+  };
 }
 
 export interface OrderStrategy {
@@ -91,6 +106,11 @@ function defaults(): AdminConfig {
       commonConfig: {
         maxSessionsPerStation: 1,
         sessionGraceMinutes: 2,
+      },
+      paymentGateways: {
+        active: "razorpay",
+        cashfree: { appId: "", secretKey: "", sandbox: true },
+        razorpay: { keyId: "", keySecret: "", sandbox: true },
       },
     },
     strategies: [

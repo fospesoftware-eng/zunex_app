@@ -20,10 +20,15 @@ interface Props {
 }
 
 function formatTime(d: Date): string {
-  const h = String(d.getHours()).padStart(2, "0");
-  const m = String(d.getMinutes()).padStart(2, "0");
+  // Indian Standard Time (UTC+5:30)
+  const h = String(d.getHours() + 5).padStart(2, "0");
+  const m = String(d.getMinutes() + 30).padStart(2, "0");
   const s = String(d.getSeconds()).padStart(2, "0");
-  return `${h}:${m}:${s}`;
+  // Carry hour overflow if needed
+  const carry = Number(m) >= 60 ? 1 : 0;
+  const finalH = ((Number(h) + carry) % 24).toString().padStart(2, "0");
+  const finalM = (Number(m) % 60).toString().padStart(2, "0");
+  return `${finalH}:${finalM}:${s}`;
 }
 
 export function TopBar({ onMenuClick }: Props) {
@@ -116,9 +121,9 @@ export function TopBar({ onMenuClick }: Props) {
             </span>
           </div>
 
-          {/* Clock */}
+          {/* Clock — Indian Standard Time */}
           <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/[0.04] border border-white/10">
-            <span className="text-[11px] text-paper-dim/70 font-medium">UTC</span>
+            <span className="text-[11px] text-paper-dim/70 font-medium">IST</span>
             <span className="text-[13px] text-paper font-semibold numeral tabular-nums">
               {formatTime(now)}
             </span>
