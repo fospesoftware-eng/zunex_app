@@ -1,13 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
+import { useEffect, useRef, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Menu,
   SlidersHorizontal,
   Search,
   Bell,
+  LogOut,
+  ChevronDown,
+  Shield,
+  Settings,
 } from "lucide-react";
+import { BrandWordmark } from "@/components/brand/Logo";
 
 interface Props {
   onMenuClick: () => void;
@@ -22,11 +27,32 @@ function formatTime(d: Date): string {
 
 export function TopBar({ onMenuClick }: Props) {
   const [now, setNow] = useState(new Date());
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(id);
   }, []);
+
+  // Click outside closes dropdown
+  useEffect(() => {
+    function onDocClick(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    }
+    if (menuOpen) document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, [menuOpen]);
+
+  const handleLogout = () => {
+    try {
+      localStorage.removeItem("zunex_admin_token");
+    } catch { /* ignore */ }
+    setMenuOpen(false);
+    window.location.href = "/backend";
+  };
 
   return (
     <header
@@ -64,7 +90,7 @@ export function TopBar({ onMenuClick }: Props) {
 
       <div className="flex-1 sm:hidden" />
 
-      {/* Right zone — live indicator, clock, notifications, profile */}
+      {/* Right zone — live indicator, clock, notifications, ZUNEX symbol (logout) */}
       <div className="flex items-center gap-2 sm:gap-3">
         {/* Live indicator */}
         <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-[rgba(36,71,255,0.08)] border border-[rgba(74,99,255,0.22)]">
@@ -95,14 +121,91 @@ export function TopBar({ onMenuClick }: Props) {
           <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#ff6a4d] shadow-[0_0_8px_rgba(255,106,77,0.8)]" />
         </button>
 
-        {/* Profile avatar — actual ZUNEX logo artwork */}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/brand/zunex-mark.png"
-          alt="ZUNEX"
-          className="h-9 w-9 rounded-[26.8%] shadow-[0_2px_12px_-4px_rgba(36,71,255,0.5)]"
-          draggable={false}
-        />
+        {/* ZUNEX symbol dropdown — logout button */}
+        <div ref={menuRef} className="relative">
+          <button
+            onClick={() => setMenuOpen((o) => !o)}
+            className="flex items-center gap-1.5 h-9 pl-1 pr-2 rounded-lg bg-white/[0.04] border border-white/10 hover:bg-white/[0.07] hover:border-white/20 transition group"
+            aria-label="Account menu"
+          >
+            {/* ZUNEX symbol svg — white rounded square with dark blue C→arrow, sized to be readable */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/brand/zunex-symbol.svg"
+              alt="ZUNEX"
+              className="h-7 w-7 rounded-md shadow-[0_2px_10px_-2px_rgba(36,71,255,0.5)]"
+              draggable={false}
+            />
+            <span className="hidden sm:block">
+              <BrandWordmark className="h-4" />
+            </span>
+            <ChevronDown
+              size={14}
+              className={`text-paper-dim transition-transform duration-200 ${menuOpen ? "rotate-180" : ""}`}
+            />
+          </button>
+
+          {/* Dropdown menu — glass card */}
+          <AnimatePresence>
+            {menuOpen && (
+              <motion.div
+                initial={{ opacity: 0, y: -6, scale: 0.97 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -6, scale: 0.97 }}
+                transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+                className="absolute right-0 top-full mt-2 w-60 rounded-xl border border-white/10 p-2 shadow-[0_24px_60px_-16px_rgba(0,0,0,0.8)] z-50"
+                style={{
+                  background: "linear-gradient(180deg, rgba(14,18,44,0.98) 0%, rgba(8,10,26,0.98) 100%)",
+                  backdropFilter: "blur(20px)",
+                }}
+              >
+                {/* Header — current session */}
+                <div className="px-3 py-2 border-b border-white/5 mb-1">
+                  <div className="flex items-center gap-2">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src="/brand/zunex-symbol.svg"
+                      alt=""
+                      className="h-7 w-7 rounded-md"
+                      draggable={false}
+                    />
+                    <div>
+                      <div className="text-[13px] text-white font-semibold">ZUNEX Admin</div>
+                      <div className="text-[10px] text-paper-dim/70">super_admin · dev mode</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Menu items */}
+                <button
+                  onClick={() => setMenuOpen(false)}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] text-paper-dim hover:text-white hover:bg-white/[0.05] transition"
+                >
+                  <Shield size={15} />
+                  Admin profile
+                </button>
+                <button
+                  onClick={() => setMenuOpen(false)}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] text-paper-dim hover:text-white hover:bg-white/[0.05] transition"
+                >
+                  <Settings size={15} />
+                  Preferences
+                </button>
+
+                <div className="h-px bg-white/5 my-1" />
+
+                {/* Logout — primary action */}
+                <button
+                  onClick={handleLogout}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium text-[#ff6a4d] hover:bg-[#ff6a4d]/10 transition"
+                >
+                  <LogOut size={15} />
+                  Log out
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
       </div>
     </header>
   );
