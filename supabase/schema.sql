@@ -27,6 +27,30 @@ create table if not exists public.stations (
 create index if not exists idx_stations_city on public.stations(city);
 
 -- -------------------------------------------------------------------------
+-- hardware — physical hardware devices bound to stations
+-- -------------------------------------------------------------------------
+create table if not exists public.hardware (
+  id                    text primary key,               -- hw_ZNX-A1
+  station_id            text not null references public.stations(id),
+  device_id             text unique,                    -- ZXN-DVC-ZNX-A1-001
+  broker_url            text,
+  mqtt_topic            text,
+  mqtt_port             integer default 1883,
+  username              text,
+  password              text,
+  firmware_version      text,
+  heartbeat_interval_ms integer default 30000,
+  last_seen_at          bigint,                         -- unix epoch ms
+  connection_status     text default 'offline',         -- 'online'|'offline'|'disconnected'
+  telemetry_enabled     boolean default true,
+  updated_at            bigint,
+  created_at            timestamptz default now()
+);
+
+create index if not exists idx_hw_station on public.hardware(station_id);
+create index if not exists idx_hw_status  on public.hardware(connection_status);
+
+-- -------------------------------------------------------------------------
 -- sessions — charging sessions (authoritative, not just cache)
 -- -------------------------------------------------------------------------
 create table if not exists public.sessions (
@@ -72,34 +96,37 @@ create table if not exists public.admin_config (
 );
 
 -- =========================================================================
--- RLS: open for now (ZUNEX publishable key is public)
+-- RLS: open for SELECT, writes blocked from publishable key
 -- =========================================================================
 alter table public.stations           enable row level security;
+alter table public.hardware           enable row level security;
 alter table public.sessions           enable row level security;
 alter table public.station_heartbeats enable row level security;
 alter table public.admin_config       enable row level security;
 
--- Allow SELECT on stations (anyone can see where to charge)
+-- SELECT open on all
 drop policy if exists "stations select" on public.stations;
 create policy "stations select" on public.stations for select using (true);
 
--- Allow SELECT on sessions (anyone can read session status)
+drop policy if exists "hardware select" on public.hardware;
+create policy "hardware select" on public.hardware for select using (true);
+
 drop policy if exists "sessions select" on public.sessions;
 create policy "sessions select" on public.sessions for select using (true);
 
--- Allow SELECT on heartbeats
 drop policy if exists "heartbeats select" on public.station_heartbeats;
 create policy "heartbeats select" on public.station_heartbeats for select using (true);
 
--- Allow SELECT on admin_config (read-only from client)
 drop policy if exists "config select" on public.admin_config;
 create policy "config select" on public.admin_config for select using (true);
 
--- INSERT/UPDATE/DELETE require service_role or custom admin auth — run
--- these separately from a secured backend, not the client.
--- For now, block writes from the publishable key:
-drop policy if exists "stations write" on public.stations;
+-- Block writes from publishable key
+drop policy if exists "stations write blocked" on public.stations;
 create policy "stations write blocked" on public.stations
+  for all using (false) with check (false);
+
+drop policy if exists "hardware write blocked" on public.hardware;
+create policy "hardware write blocked" on public.hardware
   for all using (false) with check (false);
 
 drop policy if exists "sessions write blocked" on public.sessions;
@@ -115,7 +142,7 @@ create policy "config write blocked" on public.admin_config
   for all using (false) with check (false);
 
 -- =========================================================================
--- Seed: insert the 15 demo stations from STATION_CONFIGS
+-- Seed: 15 demo stations
 -- =========================================================================
 insert into public.stations (id, name, location, power_watts, connector, base_status, device_model, install_type, city, state, lat, lng) values
   ('ZNX-A1','Zunex Gateway','Gateway Mall — Level 2',45,'USB-C','available','plus','mall','Mumbai','Maharashtra',19.0760,72.8777),
@@ -133,4 +160,25 @@ insert into public.stations (id, name, location, power_watts, connector, base_st
   ('ZNX-P1','ZUNEX P1','SG Highway Mall',45,'USB-C','available','plus','mall','Ahmedabad','Gujarat',23.0225,72.5714),
   ('ZNX-P2','Zunex Sindhu Bhavan','SG Highway Service Road',30,'USB-C','available','core','car','Ahmedabad','Gujarat',23.0316,72.5550),
   ('ZNX-J1','ZUNEX J1','Cuffe Parade Outpost',30,'USB-C','available','core','outdoor','Jaipur','Rajasthan',26.9124,75.7873)
+on conflict (id) do nothing;
+
+-- =========================================================================
+-- Seed: 15 demo hardware devices (one per station)
+-- =========================================================================
+insert into public.hardware (id, station_id, device_id, broker_url, mqtt_topic, mqtt_port, username, password, firmware_version, heartbeat_interval_ms, last_seen_at, connection_status, telemetry_enabled, updated_at) values
+  ('hw_ZNX-A1','ZNX-A1','ZXN-DVC-ZNX-A1-001','mqtt://broker.zunexglobal.com','zunex/stations/ZNX-A1',1883,'zunex_device','dev_znx-a1','v2.4.1',30000,1789549850792,'offline',true,1789549865793),
+  ('hw_ZNX-A2','ZNX-A2','ZXN-DVC-ZNX-A2-001','mqtt://broker.zunexglobal.com','zunex/stations/ZNX-A2',1883,'zunex_device','dev_znx-a2','v2.4.1',30000,1789549865793,'online',true,1789549865793),
+  ('hw_ZNX-B2','ZNX-B2','ZXN-DVC-ZNX-B2-001','mqtt://broker.zunexglobal.com','zunex/stations/ZNX-B2',1883,'zunex_device','dev_znx-b2','v2.3.0',30000,1789549820789,'online',true,1789549865793),
+  ('hw_ZNX-B3','ZNX-B3','ZXN-DVC-ZNX-B3-001','mqtt://broker.zunexglobal.com','zunex/stations/ZNX-B3',1883,'zunex_device','dev_znx-b3','v2.4.1',30000,1789549865793,'online',true,1789549865793),
+  ('hw_ZNX-L1','ZNX-L1','ZXN-DVC-ZNX-L1-001','mqtt://broker.zunexglobal.com','zunex/stations/ZNX-L1',1883,'zunex_device','dev_znx-l1','v2.4.1',30000,1789549865793,'online',true,1789549865793),
+  ('hw_ZNX-D2','ZNX-D2','ZXN-DVC-ZNX-D2-001','mqtt://broker.zunexglobal.com','zunex/stations/ZNX-D2',1883,'zunex_device','dev_znx-d2','v2.3.0',30000,1789549850792,'offline',true,1789549865793),
+  ('hw_ZNX-K3','ZNX-K3','ZXN-DVC-ZNX-K3-001','mqtt://broker.zunexglobal.com','zunex/stations/ZNX-K3',1883,'zunex_device','dev_znx-k3','v2.3.0',30000,1789549865793,'online',true,1789549865793),
+  ('hw_ZNX-K4','ZNX-K4','ZXN-DVC-ZNX-K4-001','mqtt://broker.zunexglobal.com','zunex/stations/ZNX-K4',1883,'zunex_device','dev_znx-k4','v2.4.0',30000,1789549850792,'online',false,1789549865793),
+  ('hw_ZNX-M1','ZNX-M1','ZXN-DVC-ZNX-M1-001','mqtt://broker.zunexglobal.com','zunex/stations/ZNX-M1',1883,'zunex_device','dev_znx-m1','v2.4.1',30000,1789549805788,'offline',true,1789549865793),
+  ('hw_ZNX-H2','ZNX-H2','ZXN-DVC-ZNX-H2-001','mqtt://broker.zunexglobal.com','zunex/stations/ZNX-H2',1883,'zunex_device','dev_znx-h2','v2.3.0',30000,1789549865793,'online',true,1789549865793),
+  ('hw_ZNX-C1','ZNX-C1','ZXN-DVC-ZNX-C1-001','mqtt://broker.zunexglobal.com','zunex/stations/ZNX-C1',1883,'zunex_device','dev_znx-c1','v2.3.0',30000,1789549865793,'online',true,1789549865793),
+  ('hw_ZNX-C2','ZNX-C2','ZXN-DVC-ZNX-C2-001','mqtt://broker.zunexglobal.com','zunex/stations/ZNX-C2',1883,'zunex_device','dev_znx-c2','v2.4.1',30000,1789549865793,'online',true,1789549865793),
+  ('hw_ZNX-P1','ZNX-P1','ZXN-DVC-ZNX-P1-001','mqtt://broker.zunexglobal.com','zunex/stations/ZNX-P1',1883,'zunex_device','dev_znx-p1','v2.4.1',30000,1789549850792,'offline',true,1789549865793),
+  ('hw_ZNX-P2','ZNX-P2','ZXN-DVC-ZNX-P2-001','mqtt://broker.zunexglobal.com','zunex/stations/ZNX-P2',1883,'zunex_device','dev_znx-p2','v2.3.0',30000,1789549865793,'online',true,1789549865793),
+  ('hw_ZNX-J1','ZNX-J1','ZXN-DVC-ZNX-J1-001','mqtt://broker.zunexglobal.com','zunex/stations/ZNX-J1',1883,'zunex_device','dev_znx-j1','v2.3.0',30000,1789549865793,'online',true,1789549865793)
 on conflict (id) do nothing;
