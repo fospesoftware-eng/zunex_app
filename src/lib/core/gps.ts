@@ -1,16 +1,16 @@
 // ---------------------------------------------------------------------------
 // GPS → SVG coordinate helper.
 // Equirectangular (Plate Carrée) projection into viewBox 0 0 512 512.
-// Bounds extracted from DataMeet TopoJSON (36 states, India + Kashmir).
-// This projection is IDENTICAL to the one used to generate INDIA_OUTLINE,
-// so every lat/lng pin will fall exactly on the correct spot.
+// Bounds extracted from world-atlas India geometry (Natural Earth 110m).
+// THIS IS THE SAME PROJECTION used to generate INDIA_OUTLINE — every lat/lng
+// pin lands exactly on the boundary, guaranteed.
 // ---------------------------------------------------------------------------
 
-// Geographic bounds (WGS84) — from DataMeet TopoJSON state boundaries
-const LAT_MIN = 6.77;
-const LAT_MAX = 37.08;
-const LNG_MIN = 68.10;
-const LNG_MAX = 97.39;
+// Geographic bounds (WGS84) — from world-atlas India MultiPolygon
+const LAT_MIN = 6.75;
+const LAT_MAX = 35.50;
+const LNG_MIN = 68.16;
+const LNG_MAX = 97.34;
 
 const SVG_W = 512;
 const SVG_H = 512;
