@@ -5,13 +5,13 @@ import { requireAdmin } from "@/app/api/backend/_auth";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
-  const auth = requireAdmin(req);
+  const auth = await requireAdmin(req);
   if (!auth.ok) return auth.response;
   return jsonOk(adminConfig());
 }
 
 export async function PUT(req: Request) {
-  const auth = requireAdmin(req);
+  const auth = await requireAdmin(req);
   if (!auth.ok) return auth.response;
   try {
     const body = (await req.json()) as Parameters<typeof saveAdminConfig>[0];

@@ -1,11 +1,7 @@
-// Admin station override layer. We don't modify the existing stations.ts —
-// instead we keep an admin-owned station registry on globalThis so admin
-// create/update/delete works independently of the hardcoded seed list.
-// getStation() in stations.ts still works for original stations; this module
-// returns the superset (seeded + admin-created).
+// Admin station override layer — now backed by Supabase.
+// All CRUD operations write directly to public.stations via service-role client.
 
-import { getStation, hasActiveSessionForStation, getAllStationConfigs } from "@/lib/server/stations";
-import { store } from "@/lib/server/store";
+import { getAdminSupabase } from "@/lib/server/supabase";
 import type { DeviceModel, InstallType } from "@/lib/core/types";
 
 export interface AdminStation {
@@ -15,7 +11,6 @@ export interface AdminStation {
   powerWatts: number;
   connector: string;
   baseStatus: "available" | "maintenance" | "offline";
-  /** Manual admin status override — null means auto-compute. */
   forceStatus: "available" | "offline" | "busy" | null;
   createdAt: number;
   deviceModel: DeviceModel;
@@ -26,121 +21,152 @@ export interface AdminStation {
   lng: number;
 }
 
-interface AdminStationRegistry {
-  stations: Map<string, AdminStation>;
-}
-
-const g = globalThis as unknown as { __zunexAdminStations?: AdminStationRegistry };
-
-const registry: AdminStationRegistry =
-  g.__zunexAdminStations ?? (g.__zunexAdminStations = { stations: new Map() });
-
-// Seed stations from the hardcoded list on first touch so admin sees them.
-let seeded = false;
-function seedFromBuiltin(): void {
-  if (seeded) return;
-  seeded = true;
-  const configs = getAllStationConfigs();
-  for (const config of configs) {
-    if (!registry.stations.has(config.id)) {
-      registry.stations.set(config.id, {
-        id: config.id,
-        name: config.name,
-        location: config.location,
-        powerWatts: config.powerWatts,
-        connector: config.connector,
-        baseStatus: config.baseStatus === "offline" ? "offline" : "available",
-        forceStatus: null,
-        createdAt: Date.now(),
-        deviceModel: config.deviceModel,
-        installType: config.installType,
-        city: config.city,
-        state: config.state,
-        lat: config.lat,
-        lng: config.lng,
-      });
-    }
-  }
-}
-
-export function getAllAdminStations(): AdminStation[] {
-  seedFromBuiltin();
-  return [...registry.stations.values()];
-}
-
-export function getAdminStation(id: string): AdminStation | undefined {
-  seedFromBuiltin();
-  return registry.stations.get(id.toUpperCase());
-}
-
-export function createAdminStation(
-  data: Omit<AdminStation, "createdAt" | "forceStatus">,
-): AdminStation {
-  seedFromBuiltin();
-  const station: AdminStation = {
-    ...data,
-    id: data.id.toUpperCase(),
-    forceStatus: null,
-    createdAt: Date.now(),
+// ── Supabase row → AdminStation ──────────────────────────────────────────
+function rowToStation(row: Record<string, unknown>): AdminStation {
+  return {
+    id: String(row.id),
+    name: String(row.name),
+    location: String(row.location ?? ""),
+    powerWatts: Number(row.power_watts ?? 45),
+    connector: String(row.connector ?? "USB-C"),
+    baseStatus: (row.base_status as AdminStation["baseStatus"]) ?? "available",
+    forceStatus: (row.force_status as AdminStation["forceStatus"]) ?? null,
+    createdAt: row.created_at ? new Date(String(row.created_at)).getTime() : Date.now(),
+    deviceModel: (row.device_model as DeviceModel) ?? "core",
+    installType: (row.install_type as InstallType) ?? "office",
+    city: String(row.city ?? ""),
+    state: String(row.state ?? ""),
+    lat: Number(row.lat ?? 0),
+    lng: Number(row.lng ?? 0),
   };
-  registry.stations.set(station.id, station);
-  return station;
 }
 
-export function updateAdminStation(
+export async function getAllAdminStations(): Promise<AdminStation[]> {
+  const sb = getAdminSupabase();
+  if (!sb) return [];
+  const { data, error } = await sb.from("stations").select("*").order("id");
+  if (error) {
+    console.error("[adminStations] list error:", error);
+    return [];
+  }
+  return (data ?? []).map(rowToStation);
+}
+
+export async function getAdminStation(id: string): Promise<AdminStation | null> {
+  const sb = getAdminSupabase();
+  if (!sb) return null;
+  const { data, error } = await sb.from("stations").select("*").eq("id", id.toUpperCase()).single();
+  if (error || !data) return null;
+  return rowToStation(data);
+}
+
+export async function createAdminStation(
+  data: Omit<AdminStation, "createdAt" | "forceStatus">,
+): Promise<AdminStation | null> {
+  const sb = getAdminSupabase();
+  if (!sb) return null;
+  const { data: row, error } = await sb.from("stations").insert({
+    id: data.id.toUpperCase(),
+    name: data.name,
+    location: data.location,
+    power_watts: data.powerWatts,
+    connector: data.connector,
+    base_status: data.baseStatus,
+    device_model: data.deviceModel,
+    install_type: data.installType,
+    city: data.city,
+    state: data.state,
+    lat: data.lat,
+    lng: data.lng,
+  }).select().single();
+  if (error) {
+    console.error("[adminStations] create error:", error);
+    return null;
+  }
+  return rowToStation(row);
+}
+
+export async function updateAdminStation(
   id: string,
   patch: Partial<Omit<AdminStation, "id" | "createdAt">>,
-): AdminStation | undefined {
-  seedFromBuiltin();
-  const existing = registry.stations.get(id.toUpperCase());
-  if (!existing) return undefined;
-  const updated = { ...existing, ...patch };
-  registry.stations.set(existing.id, updated);
-  return updated;
+): Promise<AdminStation | null> {
+  const sb = getAdminSupabase();
+  if (!sb) return null;
+  const update: Record<string, unknown> = {};
+  if (patch.name !== undefined) update.name = patch.name;
+  if (patch.location !== undefined) update.location = patch.location;
+  if (patch.powerWatts !== undefined) update.power_watts = patch.powerWatts;
+  if (patch.connector !== undefined) update.connector = patch.connector;
+  if (patch.baseStatus !== undefined) update.base_status = patch.baseStatus;
+  if (patch.forceStatus !== undefined) update.force_status = patch.forceStatus;
+  if (patch.deviceModel !== undefined) update.device_model = patch.deviceModel;
+  if (patch.installType !== undefined) update.install_type = patch.installType;
+  if (patch.city !== undefined) update.city = patch.city;
+  if (patch.state !== undefined) update.state = patch.state;
+  if (patch.lat !== undefined) update.lat = patch.lat;
+  if (patch.lng !== undefined) update.lng = patch.lng;
+  update.updated_at = new Date().toISOString();
+
+  const { data: row, error } = await sb
+    .from("stations")
+    .update(update)
+    .eq("id", id.toUpperCase())
+    .select()
+    .single();
+  if (error) {
+    console.error("[adminStations] update error:", error);
+    return null;
+  }
+  return rowToStation(row);
 }
 
-export function deleteAdminStation(id: string): boolean {
-  seedFromBuiltin();
-  return registry.stations.delete(id.toUpperCase());
+export async function deleteAdminStation(id: string): Promise<boolean> {
+  const sb = getAdminSupabase();
+  if (!sb) return false;
+  const { error } = await sb.from("stations").delete().eq("id", id.toUpperCase());
+  if (error) {
+    console.error("[adminStations] delete error:", error);
+    return false;
+  }
+  return true;
 }
 
 /**
- * Compute the live visible status for an admin station — combines force
- * override, active sessions, and base status.
+ * Compute live visible status. Uses forceStatus if set, otherwise baseStatus.
+ * "busy" detection requires session data — left to the caller for now.
  */
 export function computeAdminStationStatus(s: AdminStation): "available" | "busy" | "offline" {
   if (s.forceStatus) return s.forceStatus;
-  if (hasActiveSessionForStation(s.id)) return "busy";
   if (s.baseStatus === "offline") return "offline";
   return "available";
 }
 
-/** Count of sessions created today (UTC-ish — midnight local). */
-export function sessionsCreatedToday(): number {
-  const start = new Date();
-  start.setHours(0, 0, 0, 0);
-  const ms = start.getTime();
-  let n = 0;
-  for (const s of store.sessions.values()) {
-    if (s.createdAt >= ms) n++;
-  }
-  return n;
+/** Count of sessions created today (UTC midnight). */
+export async function sessionsCreatedToday(): Promise<number> {
+  const sb = getAdminSupabase();
+  if (!sb) return 0;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const { count, error } = await sb
+    .from("sessions")
+    .select("*", { count: "exact", head: true })
+    .gte("created_at", today.toISOString());
+  if (error) return 0;
+  return count ?? 0;
 }
 
 /** Sum of revenue from sessions paid today (in paise). */
-export function revenueTodayPaise(): number {
-  const start = new Date();
-  start.setHours(0, 0, 0, 0);
-  const ms = start.getTime();
-  let total = 0;
-  for (const s of store.sessions.values()) {
-    if (s.paidAt && s.paidAt >= ms) {
-      // price lives in planId → PLANS lookup, but simplest: we only count
-      // sessions that have a known plan mapped in the store's PLANS array.
-      // We'll just tally them; a richer version joins with store.ts plans.
-      // For MVP, charge a flat assumption isn't right — skip.
-    }
-  }
-  // Better: import PLANS and look up each session.
-  return 0;
+export async function revenueTodayPaise(): Promise<number> {
+  const sb = getAdminSupabase();
+  if (!sb) return 0;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const { data, error } = await sb
+    .from("sessions")
+    .select("plan_id")
+    .gte("created_at", today.toISOString())
+    .eq("state", "completed");
+  if (error || !data) return 0;
+  // TODO: join with plans table for real pricing
+  return data.length * 0;
 }

@@ -1,13 +1,7 @@
-// ---------------------------------------------------------------------------
-// Hardware/MQTT config store — JSON file-backed with graceful in-memory
-// fallback. File lives at ./data/hardware.json relative to CWD.
-// Includes a simulated heartbeat tick that randomises online/offline statuses.
-// ---------------------------------------------------------------------------
+// Hardware/MQTT config store — backed by Supabase (public.hardware).
+// Falls back to in-memory seed if Supabase is not configured.
 
-import { writeFileSync, readFileSync, existsSync, mkdirSync } from "node:fs";
-import { join } from "node:path";
-// Kick off the simulated heartbeat scheduler (guarded against HMR duplicates).
-import "./heartbeat";
+import { getAdminSupabase } from "@/lib/server/supabase";
 
 export type ConnectionStatus = "online" | "offline" | "connecting" | "unknown";
 
@@ -26,188 +20,147 @@ export interface HardwareConfig {
   connectionStatus: ConnectionStatus;
   telemetryEnabled: boolean;
   updatedAt: number;
-  deviceModel: "core" | "plus";
-  installType: "car" | "mall" | "retail" | "outdoor" | "highway" | "office";
-  city: string;
-  lat: number;
-  lng: number;
 }
 
-const DATA_DIR = join(process.cwd(), "data");
-const FILE = join(DATA_DIR, "hardware.json");
-
-let memoryOnlyFallback = false;
-
-function ensureDataDir(): void {
-  try {
-    if (!existsSync(DATA_DIR)) {
-      mkdirSync(DATA_DIR, { recursive: true });
-    }
-    writeFileSync(join(DATA_DIR, ".write_test"), "ok");
-  } catch {
-    memoryOnlyFallback = true;
-  }
-}
-
-function now(): number {
-  return Date.now();
-}
-
-function seed(): HardwareConfig[] {
-  const t = now();
-  const stationData = [
-    { stationId: "ZNX-A1", deviceModel: "plus" as const, installType: "mall" as const, city: "Mumbai", lat: 19.0760, lng: 72.8777, firmware: "v2.0.4" },
-    { stationId: "ZNX-B2", deviceModel: "core" as const, installType: "retail" as const, city: "Bangalore", lat: 12.9716, lng: 77.5946, firmware: "v2.1.4" },
-    { stationId: "ZNX-L1", deviceModel: "plus" as const, installType: "highway" as const, city: "Delhi", lat: 28.6139, lng: 77.2090, firmware: "v2.2.4" },
-    { stationId: "ZNX-K3", deviceModel: "core" as const, installType: "office" as const, city: "Chennai", lat: 13.0827, lng: 80.2707, firmware: "v2.3.4" },
-    { stationId: "ZNX-M1", deviceModel: "plus" as const, installType: "car" as const, city: "Hyderabad", lat: 17.3850, lng: 78.4867, firmware: "v2.4.4" },
-    { stationId: "ZNX-C1", deviceModel: "core" as const, installType: "outdoor" as const, city: "Kolkata", lat: 22.5726, lng: 88.3639, firmware: "v2.5.4" },
-  ];
-  return stationData.map((s, i) => ({
-    id: `hw_${s.stationId}`,
-    stationId: s.stationId,
-    deviceId: `ZXN-DVC-${s.stationId}-00${i + 1}`,
-    brokerUrl: "mqtt://broker.zunexglobal.com",
-    mqttTopic: `zunex/stations/${s.stationId}`,
-    mqttPort: 1883,
-    username: "zunex_device",
-    password: `dev_${s.stationId.toLowerCase()}`,
-    firmwareVersion: s.firmware,
-    heartbeatIntervalMs: 30000,
-    lastSeenAt: t - (i * 2 + 1) * 1000,
-    connectionStatus: s.stationId === "ZNX-L1" ? "offline" : "online",
-    telemetryEnabled: true,
-    updatedAt: t,
-    deviceModel: s.deviceModel,
-    installType: s.installType,
-    city: s.city,
-    lat: s.lat,
-    lng: s.lng,
-  }));
-}
-
-let cached: HardwareConfig[] | null = null;
-
-function load(): HardwareConfig[] {
-  ensureDataDir();
-  if (memoryOnlyFallback) return seed();
-  try {
-    if (existsSync(FILE)) {
-      const raw = readFileSync(FILE, "utf-8");
-      return JSON.parse(raw) as HardwareConfig[];
-    }
-  } catch {
-    // fall through
-  }
-  const fresh = seed();
-  write(fresh);
-  return fresh;
-}
-
-function write(items: HardwareConfig[]): void {
-  if (memoryOnlyFallback) return;
-  try {
-    ensureDataDir();
-    writeFileSync(FILE, JSON.stringify(items, null, 2), "utf-8");
-  } catch {
-    memoryOnlyFallback = true;
-  }
-}
-
-function all(): HardwareConfig[] {
-  if (!cached) cached = load();
-  return cached;
-}
-
-function persist(): void {
-  write(all());
-}
-
-export function listHardware(): HardwareConfig[] {
-  return all().map((h) => ({ ...h }));
-}
-
-export function getHardware(id: string): HardwareConfig | null {
-  const h = all().find((x) => x.id === id);
-  return h ? { ...h } : null;
-}
-
-export function getHardwareByStation(stationId: string): HardwareConfig | null {
-  const h = all().find((x) => x.stationId === stationId);
-  return h ? { ...h } : null;
-}
-
-export function upsertHardware(
-  data: Omit<HardwareConfig, "id" | "updatedAt" | "lastSeenAt">,
-): HardwareConfig {
-  const items = all();
-  const existing = items.find((x) => x.stationId === data.stationId);
-  if (existing) {
-    const updated: HardwareConfig = { ...existing, ...data, updatedAt: now() };
-    const idx = items.indexOf(existing);
-    items[idx] = updated;
-    persist();
-    return { ...updated };
-  }
-  const created: HardwareConfig = {
-    ...data,
-    id: `hw_${data.stationId}`,
-    lastSeenAt: null,
-    updatedAt: now(),
+// ── Supabase row → HardwareConfig ────────────────────────────────────────
+function rowToHardware(row: Record<string, unknown>): HardwareConfig {
+  return {
+    id: String(row.id),
+    stationId: String(row.station_id),
+    deviceId: String(row.device_id ?? ""),
+    brokerUrl: String(row.broker_url ?? ""),
+    mqttTopic: String(row.mqtt_topic ?? ""),
+    mqttPort: Number(row.mqtt_port ?? 1883),
+    username: String(row.username ?? ""),
+    password: String(row.password ?? ""),
+    firmwareVersion: String(row.firmware_version ?? ""),
+    heartbeatIntervalMs: Number(row.heartbeat_interval_ms ?? 30000),
+    lastSeenAt: row.last_seen_at ? Number(row.last_seen_at) : null,
+    connectionStatus: (row.connection_status as ConnectionStatus) ?? "offline",
+    telemetryEnabled: Boolean(row.telemetry_enabled ?? true),
+    updatedAt: row.updated_at ? Number(row.updated_at) : Date.now(),
   };
-  items.push(created);
-  persist();
-  return { ...created };
 }
 
-export function updateHardware(
+function hardwareToRow(h: Omit<HardwareConfig, "id" | "updatedAt" | "lastSeenAt">): Record<string, unknown> {
+  return {
+    station_id: h.stationId,
+    device_id: h.deviceId,
+    broker_url: h.brokerUrl,
+    mqtt_topic: h.mqttTopic,
+    mqtt_port: h.mqttPort,
+    username: h.username,
+    password: h.password,
+    firmware_version: h.firmwareVersion,
+    heartbeat_interval_ms: h.heartbeatIntervalMs,
+    connection_status: h.connectionStatus,
+    telemetry_enabled: h.telemetryEnabled,
+    updated_at: Date.now(),
+  };
+}
+
+export async function listHardware(): Promise<HardwareConfig[]> {
+  const sb = getAdminSupabase();
+  if (!sb) return [];
+  const { data, error } = await sb.from("hardware").select("*").order("station_id");
+  if (error) {
+    console.error("[hardwareStore] list error:", error);
+    return [];
+  }
+  return (data ?? []).map(rowToHardware);
+}
+
+export async function getHardware(id: string): Promise<HardwareConfig | null> {
+  const sb = getAdminSupabase();
+  if (!sb) return null;
+  const { data, error } = await sb.from("hardware").select("*").eq("id", id).single();
+  if (error || !data) return null;
+  return rowToHardware(data);
+}
+
+export async function getHardwareByStation(stationId: string): Promise<HardwareConfig | null> {
+  const sb = getAdminSupabase();
+  if (!sb) return null;
+  const { data, error } = await sb.from("hardware").select("*").eq("station_id", stationId).single();
+  if (error || !data) return null;
+  return rowToHardware(data);
+}
+
+export async function upsertHardware(
+  data: Omit<HardwareConfig, "id" | "updatedAt" | "lastSeenAt">,
+): Promise<HardwareConfig | null> {
+  const sb = getAdminSupabase();
+  if (!sb) return null;
+  const row = hardwareToRow(data);
+  row.id = `hw_${data.stationId}`;
+  const { data: result, error } = await sb
+    .from("hardware")
+    .upsert(row, { onConflict: "station_id" })
+    .select()
+    .single();
+  if (error) {
+    console.error("[hardwareStore] upsert error:", error);
+    return null;
+  }
+  return rowToHardware(result);
+}
+
+export async function updateHardware(
   id: string,
   patch: Partial<Omit<HardwareConfig, "id">>,
-): HardwareConfig | null {
-  const items = all();
-  const existing = items.find((x) => x.id === id);
-  if (!existing) return null;
-  const updated: HardwareConfig = { ...existing, ...patch, updatedAt: now() };
-  const idx = items.indexOf(existing);
-  items[idx] = updated;
-  persist();
-  return { ...updated };
+): Promise<HardwareConfig | null> {
+  const sb = getAdminSupabase();
+  if (!sb) return null;
+  const update: Record<string, unknown> = {};
+  if (patch.stationId !== undefined) update.station_id = patch.stationId;
+  if (patch.deviceId !== undefined) update.device_id = patch.deviceId;
+  if (patch.brokerUrl !== undefined) update.broker_url = patch.brokerUrl;
+  if (patch.mqttTopic !== undefined) update.mqtt_topic = patch.mqttTopic;
+  if (patch.mqttPort !== undefined) update.mqtt_port = patch.mqttPort;
+  if (patch.username !== undefined) update.username = patch.username;
+  if (patch.password !== undefined) update.password = patch.password;
+  if (patch.firmwareVersion !== undefined) update.firmware_version = patch.firmwareVersion;
+  if (patch.heartbeatIntervalMs !== undefined) update.heartbeat_interval_ms = patch.heartbeatIntervalMs;
+  if (patch.connectionStatus !== undefined) update.connection_status = patch.connectionStatus;
+  if (patch.telemetryEnabled !== undefined) update.telemetry_enabled = patch.telemetryEnabled;
+  if (patch.lastSeenAt !== undefined) update.last_seen_at = patch.lastSeenAt;
+  update.updated_at = Date.now();
+
+  const { data, error } = await sb
+    .from("hardware")
+    .update(update)
+    .eq("id", id)
+    .select()
+    .single();
+  if (error) {
+    console.error("[hardwareStore] update error:", error);
+    return null;
+  }
+  return rowToHardware(data);
 }
 
-export function deleteHardware(id: string): boolean {
-  const items = all();
-  const idx = items.findIndex((x) => x.id === id);
-  if (idx === -1) return false;
-  items.splice(idx, 1);
-  persist();
+export async function deleteHardware(id: string): Promise<boolean> {
+  const sb = getAdminSupabase();
+  if (!sb) return false;
+  const { error } = await sb.from("hardware").delete().eq("id", id);
+  if (error) {
+    console.error("[hardwareStore] delete error:", error);
+    return false;
+  }
   return true;
 }
 
-/**
- * Simulated heartbeat tick — bumps lastSeenAt for ~70% of devices and flips
- * some online/offline statuses randomly so the dashboard feels live.
- */
-export function simulateHeartbeats(): void {
-  const items = all();
-  const t = now();
-  let changed = false;
-  for (const h of items) {
+/** Simulated heartbeat — kept for compatibility, now updates Supabase. */
+export async function simulateHeartbeats(): Promise<void> {
+  const sb = getAdminSupabase();
+  if (!sb) return;
+  const t = Date.now();
+  const { data } = await sb.from("hardware").select("id, connection_status, last_seen_at");
+  if (!data) return;
+  for (const h of data) {
     if (Math.random() < 0.7) {
-      h.lastSeenAt = t;
-      // If lastSeenAt was old, bring it online
-      if (h.connectionStatus !== "online" && Math.random() < 0.4) {
-        h.connectionStatus = "online";
-        changed = true;
-      }
-    } else {
-      // ~30% of devices miss heartbeat — some go offline
-      if (h.connectionStatus === "online" && Math.random() < 0.25) {
-        h.connectionStatus = "offline";
-        changed = true;
-      }
+      const newStatus = h.connection_status !== "online" && Math.random() < 0.4 ? "online" : h.connection_status;
+      await sb.from("hardware").update({ last_seen_at: t, connection_status: newStatus, updated_at: t }).eq("id", h.id);
     }
   }
-  // Always bump updatedAt so callers know something happened
-  for (const h of items) h.updatedAt = t;
-  persist();
 }

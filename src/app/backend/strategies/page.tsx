@@ -10,7 +10,7 @@ import { Modal } from "@/components/backend/Modal";
 import { TextField } from "@/components/backend/TextField";
 import { NumberField } from "@/components/backend/NumberField";
 import { useToast } from "@/components/backend/Toast";
-import { getStoredToken } from "@/lib/client/backendAuth";
+import { getAccessToken } from "@/lib/client/backendAuth";
 import { Plus } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -56,10 +56,10 @@ export default function StrategiesPage() {
   const [search, setSearch] = useState("");
   const toast = useToast();
 
-  const load = () => {
-    const token = getStoredToken();
+  const load = async () => {
+    const token = await getAccessToken();
     const headers: Record<string, string> = {};
-    if (token) headers["x-zunex-admin-token"] = token;
+    if (token) headers["Authorization"] = `Bearer ${token}`;
     fetch("/api/backend/strategies", { headers })
       .then((r) => r.json())
       .then((j) => {
@@ -72,10 +72,10 @@ export default function StrategiesPage() {
     load();
   }, []);
 
-  const toggleEnabled = (s: StrategyRow) => {
-    const token = getStoredToken();
+  const toggleEnabled = async (s: StrategyRow) => {
+    const token = await getAccessToken();
     const headers: Record<string, string> = { "content-type": "application/json" };
-    if (token) headers["x-zunex-admin-token"] = token;
+    if (token) headers["Authorization"] = `Bearer ${token}`;
     fetch(`/api/admin/strategies/${s.id}`, {
       method: "PATCH",
       headers,
@@ -90,11 +90,11 @@ export default function StrategiesPage() {
       });
   };
 
-  const handleDelete = (s: StrategyRow) => {
+  const handleDelete = async (s: StrategyRow) => {
     if (!confirm(`Delete strategy ${s.timeSlot}?`)) return;
-    const token = getStoredToken();
+    const token = await getAccessToken();
     const headers: Record<string, string> = {};
-    if (token) headers["x-zunex-admin-token"] = token;
+    if (token) headers["Authorization"] = `Bearer ${token}`;
     fetch(`/api/admin/strategies/${s.id}`, { method: "DELETE", headers })
       .then((r) => r.json())
       .then((j) => {
@@ -226,9 +226,9 @@ function StrategyModal({
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
-    const token = getStoredToken();
+    const token = await getAccessToken();
     const headers: Record<string, string> = { "content-type": "application/json" };
-    if (token) headers["x-zunex-admin-token"] = token;
+    if (token) headers["Authorization"] = `Bearer ${token}`;
     const res = await fetch("/api/backend/strategies", {
       method: "POST",
       headers,

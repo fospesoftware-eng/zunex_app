@@ -8,7 +8,7 @@ export async function GET(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const auth = requireAdmin(req);
+  const auth = await requireAdmin(req);
   if (!auth.ok) return auth.response;
   const { id } = await params;
   const t = getTicket(id);
@@ -20,7 +20,7 @@ export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const auth = requireAdmin(req);
+  const auth = await requireAdmin(req);
   if (!auth.ok) return auth.response;
   let patch: Record<string, unknown>;
   try {
@@ -38,7 +38,7 @@ export async function DELETE(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const auth = requireAdmin(req);
+  const auth = await requireAdmin(req);
   if (!auth.ok) return auth.response;
   const { id } = await params;
   const ok = deleteTicket(id);

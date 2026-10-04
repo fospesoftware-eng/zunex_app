@@ -1,23 +1,24 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { GlassCard } from "@/components/backend/GlassCard";
 import { PageHeader } from "@/components/backend/PageHeader";
 import { DataTable } from "@/components/backend/DataTable";
 import type { ColumnDef } from "@/components/backend/DataTable";
 import { Pill } from "@/components/backend/Pill";
 import { useToast } from "@/components/backend/Toast";
-import { getStoredToken } from "@/lib/client/backendAuth";
+import { getAccessToken } from "@/lib/client/backendAuth";
 
 interface SessionRow {
   id: string;
-  stationId: string;
-  planId: string;
+  station_id: string;
+  plan_id: string;
   state: string;
-  createdAt: number;
-  paidAt: number | null;
-  endsAt: number | null;
-  completedAt: number | null;
+  created_at: string;
+  stopped_at: string | null;
+  ends_at: string | null;
+  delivered_kwh: number;
+  power_kw: number;
 }
 
 const stateVariant: Record<string, "success" | "warn" | "error" | "info" | "default"> = {
@@ -27,6 +28,7 @@ const stateVariant: Record<string, "success" | "warn" | "error" | "info" | "defa
   charging_active: "success",
   stopping: "warn",
   charging_completed: "default",
+  completed: "default",
   cancelled: "error",
   error: "error",
 };
@@ -37,55 +39,60 @@ export default function SessionsPage() {
   const [search, setSearch] = useState("");
   const toast = useToast();
 
-  const load = () => {
-    const token = getStoredToken();
+  const load = useCallback(async () => {
+    const token = await getAccessToken();
     const headers: Record<string, string> = {};
-    if (token) headers["x-zunex-admin-token"] = token;
+    if (token) headers["Authorization"] = `Bearer ${token}`;
     fetch("/api/backend/sessions", { headers })
       .then((r) => r.json())
       .then((j) => {
         if (j.ok) setSessions(j.data);
       })
       .finally(() => setLoading(false));
-  };
+  }, []);
 
   useEffect(() => {
     load();
     const iv = setInterval(load, 8000);
     return () => clearInterval(iv);
-  }, []);
+  }, [load]);
 
   const filtered = sessions.filter(
     (s) =>
       s.id.toLowerCase().includes(search.toLowerCase()) ||
-      s.stationId.toLowerCase().includes(search.toLowerCase()) ||
-      s.planId.toLowerCase().includes(search.toLowerCase()),
+      s.station_id.toLowerCase().includes(search.toLowerCase()) ||
+      s.plan_id.toLowerCase().includes(search.toLowerCase()),
   );
 
   const columns: ColumnDef<SessionRow>[] = [
-    { key: "stationId", header: "Station" },
-    { key: "planId", header: "Plan" },
+    { key: "station_id", header: "Station" },
+    { key: "plan_id", header: "Plan" },
     {
       key: "state",
       header: "State",
       render: (r) => (
-        <Pill variant={stateVariant[r.state] ?? "default"}>{r.state.replace("_", " ")}</Pill>
+        <Pill variant={stateVariant[r.state] ?? "default"}>{r.state.replace(/_/g, " ")}</Pill>
       ),
     },
     {
-      key: "createdAt",
+      key: "created_at",
       header: "Started",
-      render: (r) => <span className="text-xs text-paper-dim">{new Date(r.createdAt).toLocaleTimeString()}</span>,
+      render: (r) => <span className="text-xs text-paper-dim">{new Date(r.created_at).toLocaleTimeString()}</span>,
     },
     {
-      key: "paidAt",
-      header: "Paid at",
-      render: (r) => r.paidAt ? <span className="text-xs text-paper-dim">{new Date(r.paidAt).toLocaleTimeString()}</span> : <span className="text-xs text-paper-dim/50">—</span>,
+      key: "stopped_at",
+      header: "Stopped",
+      render: (r) => r.stopped_at ? <span className="text-xs text-paper-dim">{new Date(r.stopped_at).toLocaleTimeString()}</span> : <span className="text-xs text-paper-dim/50">—</span>,
     },
     {
-      key: "endsAt",
+      key: "ends_at",
       header: "Ends at",
-      render: (r) => r.endsAt ? <span className="text-xs text-paper-dim">{new Date(r.endsAt).toLocaleTimeString()}</span> : <span className="text-xs text-paper-dim/50">—</span>,
+      render: (r) => r.ends_at ? <span className="text-xs text-paper-dim">{new Date(r.ends_at).toLocaleTimeString()}</span> : <span className="text-xs text-paper-dim/50">—</span>,
+    },
+    {
+      key: "delivered_kwh",
+      header: "Energy",
+      render: (r) => <span className="text-xs text-paper-dim">{r.delivered_kwh.toFixed(1)} kWh</span>,
     },
   ];
 

@@ -13,7 +13,7 @@ import { Pill } from "@/components/backend/Pill";
 import { TextField } from "@/components/backend/TextField";
 import { GlassCard } from "@/components/backend/GlassCard";
 import { useToast } from "@/components/backend/Toast";
-import { getStoredToken } from "@/lib/client/backendAuth";
+import { getAccessToken } from "@/lib/client/backendAuth";
 
 type Priority = "low" | "medium" | "high" | "critical";
 type Status = "open" | "in_progress" | "resolved" | "closed";
@@ -38,17 +38,17 @@ interface StationRef {
   name: string;
 }
 
-function authHeaders(): Record<string, string> {
+async function authHeaders(): Promise<Record<string, string>> {
   const headers: Record<string, string> = { "content-type": "application/json" };
-  const token = getStoredToken();
-  if (token) headers["x-zunex-admin-token"] = token;
+  const token = await getAccessToken();
+  if (token) headers["Authorization"] = `Bearer ${token}`;
   return headers;
 }
 
-function fetchData<T>(path: string): Promise<T> {
-  const token = getStoredToken();
+async function fetchData<T>(path: string): Promise<T> {
+  const token = await getAccessToken();
   const headers: Record<string, string> = {};
-  if (token) headers["x-zunex-admin-token"] = token;
+  if (token) headers["Authorization"] = `Bearer ${token}`;
   return fetch(path, { headers }).then((r) => r.json()).then((j) => j.data as T);
 }
 
@@ -104,11 +104,11 @@ export default function TicketsPage() {
     };
   }, [tickets]);
 
-  const handleDelete = (row: TicketRow) => {
+  const handleDelete = async (row: TicketRow) => {
     if (!confirm(`Delete ticket "${row.subject}"? This cannot be undone.`)) return;
-    const token = getStoredToken();
+    const token = await getAccessToken();
     const headers: Record<string, string> = {};
-    if (token) headers["x-zunex-admin-token"] = token;
+    if (token) headers["Authorization"] = `Bearer ${token}`;
     fetch(`/api/backend/tickets/${row.id}`, { method: "DELETE", headers })
       .then((r) => r.json())
       .then((j) => {
@@ -260,12 +260,12 @@ function TicketForm({ stations, initial, onSaved, onClose }: FormProps) {
     let j: { ok: boolean; message?: string };
     if (initial) {
       const res = await fetch(`/api/backend/tickets/${initial.id}`, {
-        method: "PATCH", headers: authHeaders(), body: JSON.stringify(body),
+        method: "PATCH", headers: await authHeaders(), body: JSON.stringify(body),
       });
       j = await res.json();
     } else {
       const res = await fetch("/api/backend/tickets", {
-        method: "POST", headers: authHeaders(), body: JSON.stringify(body),
+        method: "POST", headers: await authHeaders(), body: JSON.stringify(body),
       });
       j = await res.json();
     }

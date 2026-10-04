@@ -5,13 +5,10 @@ import { requireAdmin } from "@/app/api/backend/_auth";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
-  const auth = requireAdmin(req);
+  const auth = await requireAdmin(req);
   if (!auth.ok) return auth.response;
-  const stations = getAllAdminStations().map((s) => ({
-    ...s,
-    liveStatus: computeAdminStationStatus(s),
-  }));
-  return jsonOk(stations);
+  const stations = await getAllAdminStations();
+  return jsonOk(stations.map((s) => ({ ...s, liveStatus: computeAdminStationStatus(s) })));
 }
 
 interface CreateBody {
@@ -30,7 +27,7 @@ interface CreateBody {
 }
 
 export async function POST(req: Request) {
-  const auth = requireAdmin(req);
+  const auth = await requireAdmin(req);
   if (!auth.ok) return auth.response;
   let body: CreateBody;
   try {
@@ -40,7 +37,7 @@ export async function POST(req: Request) {
   }
   if (!body.id || !body.name || !body.location)
     return jsonError("invalid_request", "id, name and location are required");
-  const station = createAdminStation({
+  const station = await createAdminStation({
     id: body.id,
     name: body.name,
     location: body.location,
@@ -54,5 +51,6 @@ export async function POST(req: Request) {
     lat: body.lat ?? 0,
     lng: body.lng ?? 0,
   });
+  if (!station) return jsonError("db_error", "Failed to create station");
   return jsonOk({ ...station, liveStatus: computeAdminStationStatus(station) }, { status: 201 });
 }

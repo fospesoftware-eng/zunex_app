@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import {
   Car,
   Building2,
@@ -9,6 +9,7 @@ import {
   Navigation,
   Building,
   MapPin,
+  Plus,
 } from "lucide-react";
 import { GlassCard } from "@/components/backend/GlassCard";
 import { PageHeader } from "@/components/backend/PageHeader";
@@ -20,8 +21,7 @@ import { Modal } from "@/components/backend/Modal";
 import { TextField } from "@/components/backend/TextField";
 import { NumberField } from "@/components/backend/NumberField";
 import { useToast } from "@/components/backend/Toast";
-import { getStoredToken } from "@/lib/client/backendAuth";
-import { Plus } from "lucide-react";
+import { getAccessToken } from "@/lib/client/backendAuth";
 
 type DeviceModel = "core" | "plus";
 type InstallType = "car" | "mall" | "retail" | "outdoor" | "highway" | "office";
@@ -71,10 +71,10 @@ export default function StationsPage() {
   const [search, setSearch] = useState("");
   const toast = useToast();
 
-  const load = () => {
-    const token = getStoredToken();
+  const load = useCallback(async () => {
+    const token = await getAccessToken();
     const headers: Record<string, string> = {};
-    if (token) headers["x-zunex-admin-token"] = token;
+    if (token) headers["Authorization"] = `Bearer ${token}`;
     fetch("/api/backend/stations", { headers })
       .then((r) => r.json())
       .then((j) => {
@@ -92,11 +92,9 @@ export default function StationsPage() {
         }
       })
       .finally(() => setLoading(false));
-  };
-
-  useEffect(() => {
-    load();
   }, []);
+
+  useEffect(() => { load(); }, [load]);
 
   const filtered = stations
     .filter(
@@ -114,11 +112,11 @@ export default function StationsPage() {
   const openCreate = () => { setEditing(null); setModalOpen(true); };
   const openEdit = (s: StationRow) => { setEditing(s); setModalOpen(true); };
 
-  const handleDelete = (s: StationRow) => {
+  const handleDelete = async (s: StationRow) => {
     if (!confirm(`Delete station ${s.id}?`)) return;
-    const token = getStoredToken();
+    const token = await getAccessToken();
     const headers: Record<string, string> = { "content-type": "application/json" };
-    if (token) headers["x-zunex-admin-token"] = token;
+    if (token) headers["Authorization"] = `Bearer ${token}`;
     fetch(`/api/backend/stations/${s.id}`, { method: "DELETE", headers })
       .then((r) => r.json())
       .then((j) => {
@@ -237,9 +235,9 @@ function StationModal({
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
-    const token = getStoredToken();
+    const token = await getAccessToken();
     const headers: Record<string, string> = { "content-type": "application/json" };
-    if (token) headers["x-zunex-admin-token"] = token;
+    if (token) headers["Authorization"] = `Bearer ${token}`;
     const method = initial ? "PATCH" : "POST";
     const url = initial ? `/api/backend/stations/${initial.id}` : "/api/backend/stations";
     const body = initial

@@ -10,7 +10,7 @@ import { Modal } from "@/components/backend/Modal";
 import { TextField } from "@/components/backend/TextField";
 import { Pill } from "@/components/backend/Pill";
 import { useToast } from "@/components/backend/Toast";
-import { getStoredToken } from "@/lib/client/backendAuth";
+import { getAccessToken } from "@/lib/client/backendAuth";
 import { Plus } from "lucide-react";
 
 interface AdminRow {
@@ -29,10 +29,10 @@ export default function AdminsPage() {
   const [search, setSearch] = useState("");
   const toast = useToast();
 
-  const load = () => {
-    const token = getStoredToken();
+  const load = async () => {
+    const token = await getAccessToken();
     const headers: Record<string, string> = {};
-    if (token) headers["x-zunex-admin-token"] = token;
+    if (token) headers["Authorization"] = `Bearer ${token}`;
     fetch("/api/backend/admins", { headers })
       .then((r) => r.json())
       .then((j) => {
@@ -41,12 +41,12 @@ export default function AdminsPage() {
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => load(), []);
+  useEffect(() => { load(); }, []);
 
-  const toggleRole = (a: AdminRow, newRole: string) => {
-    const token = getStoredToken();
+  const toggleRole = async (a: AdminRow, newRole: string) => {
+    const token = await getAccessToken();
     const headers: Record<string, string> = { "content-type": "application/json" };
-    if (token) headers["x-zunex-admin-token"] = token;
+    if (token) headers["Authorization"] = `Bearer ${token}`;
     fetch(`/api/admin/admins/${a.id}`, {
       method: "PATCH",
       headers,
@@ -58,11 +58,11 @@ export default function AdminsPage() {
       });
   };
 
-  const handleDelete = (a: AdminRow) => {
+  const handleDelete = async (a: AdminRow) => {
     if (!confirm(`Remove admin ${a.name}?`)) return;
-    const token = getStoredToken();
+    const token = await getAccessToken();
     const headers: Record<string, string> = {};
-    if (token) headers["x-zunex-admin-token"] = token;
+    if (token) headers["Authorization"] = `Bearer ${token}`;
     fetch(`/api/admin/admins/${a.id}`, { method: "DELETE", headers })
       .then((r) => r.json())
       .then((j) => {
@@ -150,9 +150,9 @@ function AdminForm({ onSaved, onClose }: { onSaved: () => void; onClose: () => v
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
-    const token = getStoredToken();
+    const token = await getAccessToken();
     const headers: Record<string, string> = { "content-type": "application/json" };
-    if (token) headers["x-zunex-admin-token"] = token;
+    if (token) headers["Authorization"] = `Bearer ${token}`;
     const res = await fetch("/api/backend/admins", {
       method: "POST",
       headers,

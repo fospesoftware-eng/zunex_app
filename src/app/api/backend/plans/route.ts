@@ -5,7 +5,7 @@ import { requireAdmin } from "@/app/api/backend/_auth";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
-  const auth = requireAdmin(req);
+  const auth = await requireAdmin(req);
   if (!auth.ok) return auth.response;
   return jsonOk({ PLANS, FREE_PLANS, WIFI_PLANS });
 }

@@ -5,9 +5,10 @@ import { listHardware, upsertHardware } from "@/lib/server/hardwareStore";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
-  const auth = requireAdmin(req);
+  const auth = await requireAdmin(req);
   if (!auth.ok) return auth.response;
-  return jsonOk(listHardware());
+  const hardware = await listHardware();
+  return jsonOk(hardware);
 }
 
 interface UpsertBody {
@@ -22,15 +23,10 @@ interface UpsertBody {
   heartbeatIntervalMs?: number;
   connectionStatus?: "online" | "offline" | "connecting" | "unknown";
   telemetryEnabled?: boolean;
-  deviceModel?: "core" | "plus";
-  installType?: "car" | "mall" | "retail" | "outdoor" | "highway" | "office";
-  city?: string;
-  lat?: number;
-  lng?: number;
 }
 
 export async function POST(req: Request) {
-  const auth = requireAdmin(req);
+  const auth = await requireAdmin(req);
   if (!auth.ok) return auth.response;
   let body: UpsertBody;
   try {
@@ -41,7 +37,7 @@ export async function POST(req: Request) {
   if (!body.stationId || !body.deviceId) {
     return jsonError("invalid_request", "stationId and deviceId are required");
   }
-  const h = upsertHardware({
+  const h = await upsertHardware({
     stationId: body.stationId,
     deviceId: body.deviceId,
     brokerUrl: body.brokerUrl ?? "mqtt://broker.zunexglobal.com",
@@ -53,11 +49,7 @@ export async function POST(req: Request) {
     heartbeatIntervalMs: body.heartbeatIntervalMs ?? 30000,
     connectionStatus: body.connectionStatus ?? "unknown",
     telemetryEnabled: body.telemetryEnabled ?? true,
-    deviceModel: body.deviceModel ?? "core",
-    installType: body.installType ?? "office",
-    city: body.city ?? "",
-    lat: body.lat ?? 0,
-    lng: body.lng ?? 0,
   });
+  if (!h) return jsonError("db_error", "Failed to upsert hardware");
   return jsonOk(h, { status: 201 });
 }

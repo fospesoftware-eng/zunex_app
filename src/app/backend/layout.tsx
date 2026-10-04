@@ -1,28 +1,39 @@
 "use client";
 
 import { useAdminAuth } from "@/lib/client/backendAuth";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { useEffect } from "react";
 import { AdminShell } from "@/components/backend/AdminShell";
 
 /**
- * Root admin layout. Verifies the admin token client-side; if a token IS
- * configured and we're not authenticated, bounces to `/backend` (the login
- * gate). If NO token is configured (open mode) or the user IS authenticated,
- * renders the shell wrapping all child pages.
+ * Root admin layout. Wraps all /backend/* routes.
+ * - `/backend` itself is the login page — renders without the shell.
+ * - All other routes require an authenticated Supabase admin user.
+ *   Unauthenticated users are bounced to `/backend`.
  */
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  const { authenticated, isLoading } = useAdminAuth();
+  const { user, isLoading } = useAdminAuth();
   const router = useRouter();
+  const pathname = usePathname();
+
+  const isLoginPage = pathname === "/backend";
 
   useEffect(() => {
-    if (!isLoading && !authenticated) {
-      // Only redirect if a token was actually configured. If no env token
-      // is set, useAdminAuth returns authenticated=true on its own, so this
-      // branch should never fire in open mode. Guard anyway.
+    if (isLoading) return;
+    // Not on login page and no user → redirect to login
+    if (!isLoginPage && !user) {
       router.replace("/backend");
     }
-  }, [authenticated, isLoading, router]);
+    // On login page but already signed in → redirect to dashboard
+    if (isLoginPage && user) {
+      router.replace("/backend/dashboard");
+    }
+  }, [user, isLoading, isLoginPage, router]);
+
+  // Login page renders bare (no shell)
+  if (isLoginPage) {
+    return <>{children}</>;
+  }
 
   if (isLoading) {
     return (
@@ -32,9 +43,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     );
   }
 
-  if (!authenticated) {
-    // Not loading but not authenticated AND a token must be configured —
-    // show loading while the redirect effect runs. Never hang forever here.
+  if (!user) {
     return (
       <div className="min-h-screen bg-[#0b1024] flex items-center justify-center">
         <div className="text-paper-dim text-sm">Redirecting…</div>

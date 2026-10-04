@@ -1,69 +1,154 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { useEffect, useState, useCallback } from "react";
 
-const STORAGE_KEY = "zunex_admin_token";
-const EXPECTED = process.env.NEXT_PUBLIC_ZUNEX_ADMIN_TOKEN ?? process.env.ZUNEX_ADMIN_TOKEN ?? "";
+const URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const PUBLISHABLE = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+
+let browserClient: SupabaseClient | null = null;
+
+function getClient(): SupabaseClient | null {
+  if (!URL || !PUBLISHABLE) return null;
+  if (!browserClient) {
+    browserClient = createClient(URL, PUBLISHABLE);
+  }
+  return browserClient;
+}
+
+export type AdminRole = "super_admin" | "admin" | "operator" | "support";
+
+export interface AdminUser {
+  id: string;
+  email: string;
+  name: string | null;
+  role: AdminRole;
+  avatarUrl: string | null;
+}
 
 /**
- * Client-side admin auth gate. Returns `authenticated: true` when ANY of:
- *   - We're in dev with no env token (free local access)
- *   - localStorage matches the expected token
- *   - NO token env var is configured at all (we treat this as "open mode"
- *     so a missed Replit env var never locks production out — you MUST
- *     explicitly set ZUNEX_ADMIN_TOKEN to enable the gate)
- * Also returns `isLoading` during the initial mount so callers can show a
- * skeleton instead of flashing the gate.
+ * Hook for Supabase Auth-backed admin authentication.
+ * Returns the current admin user (with role from public.admins) or null.
  */
 export function useAdminAuth(): {
-  authenticated: boolean;
+  user: AdminUser | null;
   isLoading: boolean;
-  setToken: (token: string) => void;
-  clearToken: () => void;
+  error: string | null;
+  signIn: (email: string, password: string) => Promise<{ ok: boolean; error?: string }>;
+  signOut: () => Promise<void>;
 } {
+  const [user, setUser] = useState<AdminUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [authenticated, setAuthenticated] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchAdminProfile = useCallback(async (userId: string): Promise<AdminUser | null> => {
+    const client = getClient();
+    if (!client) return null;
+    const { data, error: err } = await client
+      .from("admins")
+      .select("id, email, name, role, avatar_url")
+      .eq("id", userId)
+      .eq("active", true)
+      .single();
+    if (err || !data) return null;
+    return {
+      id: data.id,
+      email: data.email,
+      name: data.name,
+      role: data.role as AdminRole,
+      avatarUrl: data.avatar_url,
+    };
+  }, []);
 
   useEffect(() => {
-    const inDev = process.env.NODE_ENV === "development";
-    // OPEN MODE — no token configured anywhere. Allow access unconditionally.
-    // This is intentional: on fresh Replit deploys, no ZUNEX_ADMIN_TOKEN is
-    // set, and we don't want users locked behind an invisible gate.
-    if (!EXPECTED) {
-      setAuthenticated(true);
+    const client = getClient();
+    if (!client) {
       setIsLoading(false);
       return;
     }
-    // Token IS configured — check localStorage match
-    const stored = typeof window !== "undefined" ? localStorage.getItem(STORAGE_KEY) : null;
-    setAuthenticated(stored === EXPECTED);
-    setIsLoading(false);
-    void inDev; // keep lint happy
+
+    // Check existing session
+    client.auth.getSession().then(async ({ data: { session } }) => {
+      if (session?.user) {
+        const profile = await fetchAdminProfile(session.user.id);
+        setUser(profile);
+      }
+      setIsLoading(false);
+    });
+
+    // Listen for auth changes
+    const { data: { subscription } } = client.auth.onAuthStateChange(async (event, session) => {
+      if (event === "SIGNED_IN" && session?.user) {
+        const profile = await fetchAdminProfile(session.user.id);
+        setUser(profile);
+      } else if (event === "SIGNED_OUT") {
+        setUser(null);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [fetchAdminProfile]);
+
+  const signIn = useCallback(async (email: string, password: string) => {
+    const client = getClient();
+    if (!client) return { ok: false, error: "Supabase not configured" };
+    setError(null);
+
+    const { data, error: authErr } = await client.auth.signInWithPassword({ email, password });
+    if (authErr) {
+      const msg = authErr.message === "Invalid login credentials" ? "Invalid email or password" : authErr.message;
+      setError(msg);
+      return { ok: false, error: msg };
+    }
+    if (!data.user) {
+      return { ok: false, error: "No user returned" };
+    }
+
+    const profile = await fetchAdminProfile(data.user.id);
+    if (!profile) {
+      await client.auth.signOut();
+      const msg = "Account exists but is not an active admin. Contact a super admin.";
+      setError(msg);
+      return { ok: false, error: msg };
+    }
+
+    // Update last_login
+    await client.from("admins").update({ last_login: new Date().toISOString() }).eq("id", data.user.id);
+
+    setUser(profile);
+    return { ok: true };
+  }, [fetchAdminProfile]);
+
+  const signOut = useCallback(async () => {
+    const client = getClient();
+    if (client) await client.auth.signOut();
+    setUser(null);
   }, []);
 
-  const setToken = (token: string) => {
-    try {
-      localStorage.setItem(STORAGE_KEY, token);
-    } catch {
-      // ignore
-    }
-    setAuthenticated(!EXPECTED || token === EXPECTED);
-  };
-
-  const clearToken = () => {
-    try {
-      localStorage.removeItem(STORAGE_KEY);
-    } catch {
-      // ignore
-    }
-    // If NO env token is configured, clearing localStorage shouldn't lock us out
-    setAuthenticated(!EXPECTED);
-  };
-
-  return { authenticated, isLoading, setToken, clearToken };
+  return { user, isLoading, error, signIn, signOut };
 }
 
-export function getStoredToken(): string | null {
-  if (typeof window === "undefined") return null;
-  return localStorage.getItem(STORAGE_KEY);
+/**
+ * Role hierarchy helper. Returns true if `role` has at least `required` level.
+ */
+export function hasRole(role: AdminRole, required: AdminRole): boolean {
+  const levels: Record<AdminRole, number> = {
+    super_admin: 4,
+    admin: 3,
+    operator: 2,
+    support: 1,
+  };
+  return levels[role] >= levels[required];
 }
+
+/**
+ * Get the access token for API calls. Returns null if not signed in.
+ */
+export async function getAccessToken(): Promise<string | null> {
+  const client = getClient();
+  if (!client) return null;
+  const { data: { session } } = await client.auth.getSession();
+  return session?.access_token ?? null;
+}
+
+export { getClient as getBrowserSupabase };

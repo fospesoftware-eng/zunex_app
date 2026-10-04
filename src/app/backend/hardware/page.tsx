@@ -27,7 +27,7 @@ import { Modal } from "@/components/backend/Modal";
 import { TextField } from "@/components/backend/TextField";
 import { NumberField } from "@/components/backend/NumberField";
 import { useToast } from "@/components/backend/Toast";
-import { getStoredToken } from "@/lib/client/backendAuth";
+import { getAccessToken } from "@/lib/client/backendAuth";
 
 type ConnectionStatus = "online" | "offline" | "connecting" | "unknown";
 type DeviceModel = "core" | "plus";
@@ -55,17 +55,17 @@ interface HardwareRow {
   lng: number;
 }
 
-function getHeaders(): Record<string, string> {
-  const token = getStoredToken();
+async function getHeaders(): Promise<Record<string, string>> {
+  const token = await getAccessToken();
   const headers: Record<string, string> = {};
-  if (token) headers["x-zunex-admin-token"] = token;
+  if (token) headers["Authorization"] = `Bearer ${token}`;
   return headers;
 }
 
-function authHeaders(): Record<string, string> {
+async function authHeaders(): Promise<Record<string, string>> {
   const headers: Record<string, string> = { "content-type": "application/json" };
-  const token = getStoredToken();
-  if (token) headers["x-zunex-admin-token"] = token;
+  const token = await getAccessToken();
+  if (token) headers["Authorization"] = `Bearer ${token}`;
   return headers;
 }
 
@@ -95,7 +95,7 @@ export default function HardwareConfigPage() {
 
   const load = async () => {
     try {
-      const res = await fetch("/api/backend/hardware", { headers: getHeaders() });
+      const res = await fetch("/api/backend/hardware", { headers: await getHeaders() });
       const j = await res.json();
       if (j.ok) setDevices(j.data ?? []);
     } catch { /* ignore */ }
@@ -109,7 +109,7 @@ export default function HardwareConfigPage() {
   }, []);
 
   const triggerHeartbeat = async () => {
-    const res = await fetch("/api/backend/hardware/heartbeat", { method: "POST", headers: getHeaders() });
+    const res = await fetch("/api/backend/hardware/heartbeat", { method: "POST", headers: await getHeaders() });
     const j = await res.json();
     if (j.ok) {
       setDevices(j.data ?? []);
@@ -320,7 +320,7 @@ function HardwareForm({ initial, onSaved, onClose }: HardwareFormProps) {
       firmwareVersion, heartbeatIntervalMs, telemetryEnabled, deviceModel, installType,
     };
     const res = await fetch(`/api/backend/hardware/${initial.id}`, {
-      method: "PATCH", headers: authHeaders(), body: JSON.stringify(body),
+      method: "PATCH", headers: await authHeaders(), body: JSON.stringify(body),
     });
     const j = await res.json();
     if (j.ok) { toast.show("success", "Device config updated"); onSaved(); }

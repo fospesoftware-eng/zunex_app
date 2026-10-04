@@ -4,61 +4,42 @@ import { useAdminAuth } from "@/lib/client/backendAuth";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Shield, ArrowRight, Zap } from "lucide-react";
+import { Shield, ArrowRight, Zap, Eye, EyeOff, Mail, Lock } from "lucide-react";
 
 /**
- * Root `/admin` URL — if already logged in it bounces to dashboard;
- * otherwise renders a glass token gate.
+ * Admin login page. Uses Supabase Auth (email/password).
+ * Once authenticated, bounces to /backend/dashboard.
  */
-export default function AdminRootPage() {
-  const { authenticated, isLoading, setToken } = useAdminAuth();
+export default function AdminLoginPage() {
+  const { user, isLoading, error, signIn } = useAdminAuth();
   const router = useRouter();
-  const [token, setTokenLocal] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
-  const hasEnvToken = !!process.env.NEXT_PUBLIC_ZUNEX_ADMIN_TOKEN || !!process.env.ZUNEX_ADMIN_TOKEN;
-
-  // If no token configured at all (open mode — works in dev AND prod), skip
-  // the gate entirely and go straight to dashboard. Done in an effect to
-  // avoid the "update Router during render" React error.
   useEffect(() => {
-    if (hasEnvToken) return; // token IS configured → gate applies
-    // No token set anywhere → open mode, bounce straight to dashboard
-    router.replace("/backend/dashboard");
-  }, [hasEnvToken, router]);
-
-  // Also redirect when already authenticated.
-  useEffect(() => {
-    if (!isLoading && authenticated) {
+    if (user) {
       router.replace("/backend/dashboard");
     }
-  }, [authenticated, isLoading, router]);
+  }, [user, router]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const expected =
-      process.env.NEXT_PUBLIC_ZUNEX_ADMIN_TOKEN ?? process.env.ZUNEX_ADMIN_TOKEN ?? "";
-    if (expected && token !== expected) {
-      setError("That token doesn't match our records.");
-      return;
+    setFormError(null);
+    setSubmitting(true);
+    const result = await signIn(email.trim(), password);
+    setSubmitting(false);
+    if (!result.ok && result.error) {
+      setFormError(result.error);
     }
-    setToken(token);
-    router.replace("/backend/dashboard");
   };
 
   if (isLoading) {
     return (
       <div className="min-h-screen bg-[#0b1024] flex items-center justify-center">
         <div className="text-paper-dim text-sm">Loading…</div>
-      </div>
-    );
-  }
-
-  // If no token configured at all + already handled by effect above, show loading.
-  if (!hasEnvToken) {
-    return (
-      <div className="min-h-screen bg-[#0b1024] flex items-center justify-center">
-        <div className="text-paper-dim text-sm">Redirecting…</div>
       </div>
     );
   }
@@ -77,8 +58,7 @@ export default function AdminRootPage() {
         transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
         className="relative w-full max-w-md rounded-2xl border border-white/10 p-8 shadow-[0_40px_100px_-30px_rgba(0,0,0,0.9)]"
         style={{
-          background:
-            "linear-gradient(165deg, rgba(20,26,60,0.92) 0%, rgba(6,8,20,0.97) 100%)",
+          background: "linear-gradient(165deg, rgba(20,26,60,0.92) 0%, rgba(6,8,20,0.97) 100%)",
           backdropFilter: "blur(24px)",
         }}
       >
@@ -90,51 +70,77 @@ export default function AdminRootPage() {
           </div>
           <div>
             <h1 className="font-display text-xl font-semibold tracking-tight text-paper">ZUNEX Admin</h1>
-            <p className="text-xs text-paper-dim">Restricted area</p>
+            <p className="text-xs text-paper-dim">Sign in to access the control panel</p>
           </div>
         </div>
 
-        <p className="text-sm text-paper-dim mb-6 leading-relaxed">
-          Enter your admin token to access the control panel. You can find it in your{" "}
-          <code className="text-[#a9bcff] bg-white/5 px-1.5 py-0.5 rounded">ZUNEX_ADMIN_TOKEN</code>{" "}
-          environment variable.
-        </p>
-
         <form onSubmit={handleSubmit} className="space-y-4">
           <label className="flex flex-col gap-1.5">
-            <span className="text-xs uppercase tracking-wider text-paper-dim font-medium">Admin token</span>
-            <input
-              type="password"
-              autoFocus
-              value={token}
-              onChange={(e) => {
-                setTokenLocal(e.target.value);
-                setError(null);
-              }}
-              className="h-11 rounded-xl bg-black/40 border border-white/10 px-3 text-sm text-paper placeholder:text-paper-dim/40 focus:outline-none focus:border-[#4a63ff] focus:ring-2 focus:ring-[#4a63ff]/25 transition"
-              placeholder="••••••••"
-              required
-            />
+            <span className="text-xs uppercase tracking-wider text-paper-dim font-medium">Email</span>
+            <div className="relative">
+              <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-paper-dim/50" />
+              <input
+                type="email"
+                autoFocus
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="h-11 w-full rounded-xl bg-black/40 border border-white/10 pl-9 pr-3 text-sm text-paper placeholder:text-paper-dim/40 focus:outline-none focus:border-[#4a63ff] focus:ring-2 focus:ring-[#4a63ff]/25 transition"
+                placeholder="admin@zunexglobal.com"
+                required
+                disabled={submitting}
+              />
+            </div>
           </label>
 
-          {error && (
+          <label className="flex flex-col gap-1.5">
+            <span className="text-xs uppercase tracking-wider text-paper-dim font-medium">Password</span>
+            <div className="relative">
+              <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-paper-dim/50" />
+              <input
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="h-11 w-full rounded-xl bg-black/40 border border-white/10 pl-9 pr-10 text-sm text-paper placeholder:text-paper-dim/40 focus:outline-none focus:border-[#4a63ff] focus:ring-2 focus:ring-[#4a63ff]/25 transition"
+                placeholder="••••••••"
+                required
+                disabled={submitting}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((s) => !s)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-paper-dim/50 hover:text-paper-dim transition"
+                tabIndex={-1}
+              >
+                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
+          </label>
+
+          {(formError || error) && (
             <div className="text-xs text-ember-400 bg-ember-500/10 border border-ember-500/20 rounded-lg px-3 py-2">
-              {error}
+              {formError || error}
             </div>
           )}
 
           <button
             type="submit"
-            className="w-full h-11 rounded-xl font-medium text-white flex items-center justify-center gap-2 bg-gradient-to-br from-[#4a63ff] to-[#2447ff] border border-white/20 shadow-[0_14px_40px_-10px_rgba(36,71,255,0.65)] hover:brightness-110 active:brightness-95 transition"
+            disabled={submitting}
+            className="w-full h-11 rounded-xl font-medium text-white flex items-center justify-center gap-2 bg-gradient-to-br from-[#4a63ff] to-[#2447ff] border border-white/20 shadow-[0_14px_40px_-10px_rgba(36,71,255,0.65)] hover:brightness-110 active:brightness-95 transition disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            Enter admin
-            <ArrowRight size={16} />
+            {submitting ? (
+              <span className="text-sm">Signing in…</span>
+            ) : (
+              <>
+                <span>Sign in</span>
+                <ArrowRight size={16} />
+              </>
+            )}
           </button>
         </form>
 
         <div className="mt-6 pt-4 border-t border-white/10 flex items-center gap-2 text-[11px] text-paper-dim">
           <Zap size={12} />
-          <span>Token-gated · open mode when no env var set</span>
+          <span>Supabase Auth · Role-based access</span>
         </div>
       </motion.div>
     </div>

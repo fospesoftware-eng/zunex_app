@@ -7,7 +7,7 @@ import { Button } from "@/components/backend/Button";
 import { DataTable } from "@/components/backend/DataTable";
 import type { ColumnDef } from "@/components/backend/DataTable";
 import { useToast } from "@/components/backend/Toast";
-import { getStoredToken } from "@/lib/client/backendAuth";
+import { getAccessToken } from "@/lib/client/backendAuth";
 import { Plus, Eye, EyeOff, Check, CircleDot } from "lucide-react";
 
 type GatewayActive = "cashfree" | "razorpay" | "none";
@@ -33,33 +33,35 @@ export default function SettingsPage() {
   const toast = useToast();
 
   useEffect(() => {
-    const token = getStoredToken();
-    const headers: Record<string, string> = {};
-    if (token) headers["x-zunex-admin-token"] = token;
-    fetch("/api/backend/config", { headers })
-      .then((r) => r.json())
-      .then((j) => {
-        if (j.ok) {
-          setSettings({
-            commissionRatePct: j.data.settings.commissionRatePct,
-            defaultPowerWatts: j.data.settings.defaultPowerWatts,
-            commonConfig: j.data.settings.commonConfig,
-            paymentGateways: j.data.settings.paymentGateways ?? {
-              active: "razorpay",
-              cashfree: { appId: "", secretKey: "", sandbox: true },
-              razorpay: { keyId: "", keySecret: "", sandbox: true },
-            },
-          });
-        }
-      })
-      .finally(() => setLoading(false));
+    (async () => {
+      const token = await getAccessToken();
+      const headers: Record<string, string> = {};
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+      fetch("/api/backend/config", { headers })
+        .then((r) => r.json())
+        .then((j) => {
+          if (j.ok) {
+            setSettings({
+              commissionRatePct: j.data.settings.commissionRatePct,
+              defaultPowerWatts: j.data.settings.defaultPowerWatts,
+              commonConfig: j.data.settings.commonConfig,
+              paymentGateways: j.data.settings.paymentGateways ?? {
+                active: "razorpay",
+                cashfree: { appId: "", secretKey: "", sandbox: true },
+                razorpay: { keyId: "", keySecret: "", sandbox: true },
+              },
+            });
+          }
+        })
+        .finally(() => setLoading(false));
+    })();
   }, []);
 
   const save = async (partial: Partial<Settings>) => {
     setSaving(true);
-    const token = getStoredToken();
+    const token = await getAccessToken();
     const headers: Record<string, string> = {};
-    if (token) headers["x-zunex-admin-token"] = token;
+    if (token) headers["Authorization"] = `Bearer ${token}`;
     const cur = await fetch("/api/backend/config", { headers }).then((r) => r.json());
     if (!cur.ok) { toast.show("error", "Could not read config"); setSaving(false); return; }
     const cfg = cur.data;

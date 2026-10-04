@@ -5,7 +5,7 @@ import { GlassCard } from "@/components/backend/GlassCard";
 import { PageHeader } from "@/components/backend/PageHeader";
 import { Pill } from "@/components/backend/Pill";
 import { useToast } from "@/components/backend/Toast";
-import { getStoredToken } from "@/lib/client/backendAuth";
+import { getAccessToken } from "@/lib/client/backendAuth";
 
 interface Plan {
   id: string;
@@ -22,16 +22,18 @@ export default function PricingPage() {
   const toast = useToast();
 
   useEffect(() => {
-    const token = getStoredToken();
-    const headers: Record<string, string> = {};
-    if (token) headers["x-zunex-admin-token"] = token;
-    fetch("/api/backend/plans", { headers })
-      .then((r) => r.json())
-      .then((j) => {
-        if (j.ok) setPlans(j.data);
-      })
-      .catch(() => toast.show("error", "Failed to load pricing"))
-      .finally(() => setLoading(false));
+    (async () => {
+      const token = await getAccessToken();
+      const headers: Record<string, string> = {};
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+      fetch("/api/backend/plans", { headers })
+        .then((r) => r.json())
+        .then((j) => {
+          if (j.ok) setPlans(j.data);
+        })
+        .catch(() => toast.show("error", "Failed to load pricing"))
+        .finally(() => setLoading(false));
+    })();
   }, [toast]);
 
   const tabs = [

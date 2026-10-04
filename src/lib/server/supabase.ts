@@ -7,8 +7,10 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const PUBLISHABLE = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+const SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 let serverClient: SupabaseClient | null = null;
+let adminClient: SupabaseClient | null = null;
 
 /** Server-side singleton — use in API routes / server components. */
 export function getServerSupabase(): SupabaseClient | null {
@@ -24,6 +26,25 @@ export function getServerSupabase(): SupabaseClient | null {
     });
   }
   return serverClient;
+}
+
+/**
+ * Service-role client — bypasses RLS, full read/write.
+ * NEVER expose to browser. Server-only.
+ */
+export function getAdminSupabase(): SupabaseClient | null {
+  if (!URL || !SERVICE_ROLE) {
+    if (process.env.NODE_ENV !== "production") {
+      console.warn("[supabase] env SUPABASE_SERVICE_ROLE_KEY missing — admin writes disabled");
+    }
+    return null;
+  }
+  if (!adminClient) {
+    adminClient = createClient(URL, SERVICE_ROLE, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+  }
+  return adminClient;
 }
 
 /** Browser client — use in client components. */

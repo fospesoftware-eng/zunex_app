@@ -5,7 +5,7 @@ import { requireAdmin } from "@/app/api/backend/_auth";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
-  const auth = requireAdmin(req);
+  const auth = await requireAdmin(req);
   if (!auth.ok) return auth.response;
   return jsonOk(adminConfig().admins);
 }
@@ -17,7 +17,7 @@ interface CreateAdmin {
 }
 
 export async function POST(req: Request) {
-  const auth = requireAdmin(req);
+  const auth = await requireAdmin(req);
   if (!auth.ok) return auth.response;
   let body: CreateAdmin;
   try {

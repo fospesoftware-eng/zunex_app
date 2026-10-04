@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { getStoredToken } from "@/lib/client/backendAuth";
+import { getAccessToken } from "@/lib/client/backendAuth";
 
 interface SessionEvent {
   id: string;
@@ -65,11 +65,10 @@ export function ActivityFeed() {
   const [time, setTime] = useState(Date.now());
 
   useEffect(() => {
-    const token = getStoredToken();
-    const headers: Record<string, string> = {};
-    if (token) headers["x-zunex-admin-token"] = token;
-
-    const fetchSessions = () => {
+    const fetchSessions = async () => {
+      const token = await getAccessToken();
+      const headers: Record<string, string> = {};
+      if (token) headers["Authorization"] = `Bearer ${token}`;
       fetch("/api/backend/sessions", { headers })
         .then((r) => r.json())
         .then((j) => {

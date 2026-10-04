@@ -6,7 +6,7 @@ import { PageHeader } from "@/components/backend/PageHeader";
 import { Button } from "@/components/backend/Button";
 import { TextField } from "@/components/backend/TextField";
 import { useToast } from "@/components/backend/Toast";
-import { getStoredToken } from "@/lib/client/backendAuth";
+import { getAccessToken } from "@/lib/client/backendAuth";
 
 interface ContentForm {
   brandName: string;
@@ -21,25 +21,27 @@ export default function ContentPage() {
   const toast = useToast();
 
   useEffect(() => {
-    const token = getStoredToken();
-    const headers: Record<string, string> = {};
-    if (token) headers["x-zunex-admin-token"] = token;
-    fetch("/api/backend/config", { headers })
-      .then((r) => r.json())
-      .then((j) => {
-        if (j.ok) {
-          const s = j.data.settings;
-          setForm({ brandName: s.brandName, tagline: s.tagline, supportEmail: s.supportEmail });
-        }
-      })
-      .finally(() => setLoading(false));
+    (async () => {
+      const token = await getAccessToken();
+      const headers: Record<string, string> = {};
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+      fetch("/api/backend/config", { headers })
+        .then((r) => r.json())
+        .then((j) => {
+          if (j.ok) {
+            const s = j.data.settings;
+            setForm({ brandName: s.brandName, tagline: s.tagline, supportEmail: s.supportEmail });
+          }
+        })
+        .finally(() => setLoading(false));
+    })();
   }, []);
 
   const save = async () => {
     setSaving(true);
-    const token = getStoredToken();
+    const token = await getAccessToken();
     const headers: Record<string, string> = {};
-    if (token) headers["x-zunex-admin-token"] = token;
+    if (token) headers["Authorization"] = `Bearer ${token}`;
     // Fetch current config so we only change these three fields
     const cur = await fetch("/api/backend/config", { headers }).then((r) => r.json());
     if (!cur.ok) { toast.show("error", "Could not read config"); setSaving(false); return; }

@@ -12,7 +12,7 @@ export async function POST(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const auth = requireAdmin(req);
+  const auth = await requireAdmin(req);
   if (!auth.ok) return auth.response;
   let body: ControlBody;
   try {

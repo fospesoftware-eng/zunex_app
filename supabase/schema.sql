@@ -95,6 +95,42 @@ create table if not exists public.admin_config (
   updated_at timestamptz default now()
 );
 
+-- -------------------------------------------------------------------------
+-- admins — admin accounts linked to Supabase Auth users
+-- -------------------------------------------------------------------------
+create table if not exists public.admins (
+  id          uuid primary key references auth.users(id) on delete cascade,
+  email       text not null unique,
+  name        text,
+  role        text not null default 'operator' check (role in ('super_admin','admin','operator','support')),
+  avatar_url  text,
+  last_login  timestamptz,
+  active      boolean default true,
+  created_at  timestamptz default now(),
+  updated_at  timestamptz default now()
+);
+
+create index if not exists idx_admins_role on public.admins(role);
+create index if not exists idx_admins_active on public.admins(active);
+
+-- -------------------------------------------------------------------------
+-- Trigger: sync admins row on auth.users creation (optional bootstrap)
+-- -------------------------------------------------------------------------
+create or replace function public.handle_new_admin()
+returns trigger as $$
+begin
+  insert into public.admins (id, email, name, role)
+  values (new.id, new.email, coalesce(new.raw_user_meta_data->>'name', split_part(new.email, '@', 1)), 'operator')
+  on conflict (id) do nothing;
+  return new;
+end;
+$$ language plpgsql security definer;
+
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute function public.handle_new_admin();
+
 -- =========================================================================
 -- RLS: open for SELECT, writes blocked from publishable key
 -- =========================================================================
