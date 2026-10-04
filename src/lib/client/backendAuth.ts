@@ -69,12 +69,17 @@ export function useAdminAuth(): {
 
     // Check existing session
     client.auth.getSession().then(async ({ data: { session } }) => {
-      if (session?.user) {
-        const profile = await fetchAdminProfile(session.user.id);
-        setUser(profile);
+      try {
+        if (session?.user) {
+          const profile = await fetchAdminProfile(session.user.id);
+          setUser(profile);
+        }
+      } catch {
+        // profile fetch failed — fall through to signed-out state
+      } finally {
+        setIsLoading(false);
       }
-      setIsLoading(false);
-    });
+    }).catch(() => setIsLoading(false));
 
     // Listen for auth changes
     const { data: { subscription } } = client.auth.onAuthStateChange(async (event, session) => {
