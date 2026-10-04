@@ -117,9 +117,6 @@ export function useAdminAuth(): {
       return { ok: false, error: msg };
     }
 
-    // Update last_login
-    await client.from("admins").update({ last_login: new Date().toISOString() }).eq("id", data.user.id);
-
     setUser(profile);
     return { ok: true };
   }, [fetchAdminProfile]);

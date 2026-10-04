@@ -113,6 +113,15 @@ create table if not exists public.admins (
 create index if not exists idx_admins_role on public.admins(role);
 create index if not exists idx_admins_active on public.admins(active);
 
+-- RLS: authenticated users may read ONLY their own admin row (needed for
+-- client-side role check at login). Writes stay service-role only.
+alter table public.admins enable row level security;
+
+drop policy if exists "admins select own" on public.admins;
+create policy "admins select own" on public.admins
+  for select to authenticated
+  using (auth.uid() = id);
+
 -- -------------------------------------------------------------------------
 -- Trigger: sync admins row on auth.users creation (optional bootstrap)
 -- -------------------------------------------------------------------------
