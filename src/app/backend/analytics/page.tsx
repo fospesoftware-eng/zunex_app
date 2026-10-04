@@ -5,46 +5,65 @@ import { motion } from "framer-motion";
 import { GlassCard } from "@/components/backend/GlassCard";
 import { PageHeader } from "@/components/backend/PageHeader";
 import { SparklineChart } from "@/components/backend/SparklineChart";
+import { getAccessToken } from "@/lib/client/backendAuth";
 
-// Deterministic pseudo-random for 24 hours — peak 18-22
-function hourlyDistribution(): number[] {
-  // Base curve with peak at 20h
-  return [
-    2, 3, 4, 3, 2, 4, 8, 14, 22, 30, 38, 45,
-    52, 58, 65, 72, 80, 88, 95, 92, 78, 55, 35, 18,
-  ];
+interface PlanShare {
+  planId: string;
+  label: string;
+  count: number;
+  pct: number;
 }
 
-const planPopularity = [
-  { name: "Quick", value: 52, color: "#4a63ff" },
-  { name: "Standard", value: 31, color: "#7dedc4" },
-  { name: "Trial", value: 17, color: "#ffb020" },
-];
+interface TopStation {
+  rank: number;
+  id: string;
+  name: string;
+  sessions: number;
+  utilization: number;
+}
 
-const topStations = [
-  { rank: 1, name: "ZUNEX One", id: "ZNX-A1", sessions: 234, utilization: 87 },
-  { rank: 2, name: "ZUNEX B2", id: "ZNX-B2", sessions: 198, utilization: 72 },
-  { rank: 3, name: "ZUNEX L1", id: "ZNX-L1", sessions: 156, utilization: 58 },
-  { rank: 4, name: "ZUNEX K3", id: "ZNX-K3", sessions: 89, utilization: 34 },
-];
+interface AnalyticsData {
+  hourly: number[];
+  revenueTrend: number[];
+  planShare: PlanShare[];
+  topStations: TopStation[];
+  totalSessions7d: number;
+}
+
+const PLAN_COLORS = ["#4a63ff", "#7dedc4", "#ffb020", "#ff8a4d", "#a9bcff"];
 
 export default function AnalyticsPage() {
-  const [hourly, setHourly] = useState<number[]>([]);
+  const [data, setData] = useState<AnalyticsData | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Generate deterministically on mount
-    setHourly(hourlyDistribution());
+    (async () => {
+      const token = await getAccessToken();
+      const headers: Record<string, string> = {};
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+      try {
+        const res = await fetch("/api/backend/analytics", { headers });
+        const j = await res.json();
+        if (j.ok) setData(j.data);
+      } catch {
+        // keep empty state
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, []);
 
-  const revenueTrend = useMemo(
-    () => [
-      1200, 1450, 1680, 1520, 1380, 1820, 2400, 2980, 3650, 4120, 4780, 5340,
-      5890, 6450, 7020, 7680, 8340, 8920, 9450, 9120, 8450, 7230, 5890, 4320,
-    ],
-    [],
-  );
-
+  const hourly = data?.hourly ?? [];
   const maxHourly = Math.max(...hourly, 1);
+
+  // Highlight the top-3 busiest hours
+  const peakHours = useMemo(() => {
+    const indexed = hourly.map((v, i) => ({ v, i }));
+    indexed.sort((a, b) => b.v - a.v);
+    const top = indexed.filter((e) => e.v > 0).slice(0, 3).map((e) => e.i);
+    return new Set(top);
+  }, [hourly]);
+
   const chartHeight = 220;
   const barWidth = 14;
   const gap = 6;
@@ -53,7 +72,7 @@ export default function AnalyticsPage() {
     <div className="page-enter space-y-6">
       <PageHeader
         title="Analytics"
-        subtitle="Usage, revenue and plan performance — lifetime overview."
+        subtitle="Usage, revenue and plan performance — live from LiveDB."
       />
 
       {/* Hourly session distribution */}
@@ -61,14 +80,17 @@ export default function AnalyticsPage() {
         title="Hourly session distribution"
         subtitle="Today · sessions per hour"
       >
-        {hourly.length > 0 && (
+        {loading ? (
+          <div className="h-[220px] flex items-center justify-center text-sm text-paper-dim/60">
+            Loading analytics…
+          </div>
+        ) : hourly.length > 0 ? (
           <div className="w-full overflow-x-auto">
             <svg
               viewBox={`0 0 ${hourly.length * (barWidth + gap)} ${chartHeight}`}
               className="w-full h-auto min-w-[560px]"
               preserveAspectRatio="xMidYMid meet"
             >
-              {/* Y axis baseline */}
               <line
                 x1={0}
                 y1={chartHeight - 24}
@@ -89,11 +111,7 @@ export default function AnalyticsPage() {
                       width={barWidth}
                       height={h}
                       rx={3}
-                      fill={
-                        i >= 18 && i <= 22
-                          ? "url(#barGradPeak)"
-                          : "url(#barGrad)"
-                      }
+                      fill={peakHours.has(i) ? "url(#barGradPeak)" : "url(#barGrad)"}
                       initial={{ height: 0, y: chartHeight - 24 }}
                       animate={{ height: h, y }}
                       transition={{
@@ -126,92 +144,120 @@ export default function AnalyticsPage() {
               </defs>
             </svg>
           </div>
-        )}
+        ) : null}
       </GlassCard>
 
       <div className="grid lg:grid-cols-2 gap-6">
         {/* Plan popularity */}
         <GlassCard
           title="Plan popularity"
-          subtitle="Share of active users"
+          subtitle="Share of sessions · last 7 days"
         >
-          <div className="space-y-5">
-            {planPopularity.map((p) => (
-              <div key={p.name}>
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-sm text-paper font-medium">{p.name}</span>
-                  <span className="text-sm text-paper-dim numeral">{p.value}%</span>
+          {loading ? (
+            <div className="h-[140px] flex items-center justify-center text-sm text-paper-dim/60">
+              Loading…
+            </div>
+          ) : data && data.planShare.length > 0 ? (
+            <div className="space-y-5">
+              {data.planShare.map((p, idx) => (
+                <div key={p.planId}>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-sm text-paper font-medium">{p.label}</span>
+                    <span className="text-sm text-paper-dim numeral">
+                      {p.pct}% · {p.count}
+                    </span>
+                  </div>
+                  <div className="h-2.5 w-full rounded-full bg-white/5 overflow-hidden">
+                    <motion.div
+                      className="h-full rounded-full"
+                      style={{ background: PLAN_COLORS[idx % PLAN_COLORS.length] }}
+                      initial={{ width: 0 }}
+                      animate={{ width: `${p.pct}%` }}
+                      transition={{
+                        duration: 0.9,
+                        delay: 0.3,
+                        ease: [0.22, 1, 0.36, 1],
+                      }}
+                    />
+                  </div>
                 </div>
-                <div className="h-2.5 w-full rounded-full bg-white/5 overflow-hidden">
-                  <motion.div
-                    className="h-full rounded-full"
-                    style={{ background: p.color }}
-                    initial={{ width: 0 }}
-                    animate={{ width: `${p.value}%` }}
-                    transition={{
-                      duration: 0.9,
-                      delay: 0.3,
-                      ease: [0.22, 1, 0.36, 1],
-                    }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div className="h-[140px] flex items-center justify-center text-sm text-paper-dim/60">
+              No sessions recorded in the last 7 days
+            </div>
+          )}
         </GlassCard>
 
         {/* Revenue trend */}
         <GlassCard
           title="Revenue trend"
-          subtitle="Last 24 hours · ₹"
+          subtitle="Today · ₹ per hour"
         >
-          <SparklineChart
-            data={revenueTrend}
-            color="#ffb020"
-            height={200}
-            label="Revenue (₹)"
-            xLabels={["00", "06", "12", "18", "24"]}
-          />
+          {loading ? (
+            <div className="h-[200px] flex items-center justify-center text-sm text-paper-dim/60">
+              Loading…
+            </div>
+          ) : (
+            <SparklineChart
+              data={data?.revenueTrend ?? new Array(24).fill(0)}
+              color="#ffb020"
+              height={200}
+              label="Revenue (₹)"
+              xLabels={["00", "06", "12", "18", "24"]}
+            />
+          )}
         </GlassCard>
       </div>
 
       {/* Top stations */}
-      <GlassCard title="Top stations" subtitle="Ranked by sessions this week">
-        <div className="space-y-3">
-          {topStations.map((s) => (
-            <div
-              key={s.id}
-              className="flex items-center gap-4 rounded-xl bg-white/[0.02] border border-white/5 px-4 py-3"
-            >
-              <div className="w-7 h-7 rounded-lg bg-white/[0.06] border border-white/10 flex items-center justify-center text-xs font-semibold text-paper-dim numeral">
-                {s.rank}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1.5">
-                  <span className="text-sm font-semibold text-paper truncate">{s.name}</span>
-                  <span className="text-[10px] font-mono text-paper-dim">{s.id}</span>
+      <GlassCard title="Top stations" subtitle="Ranked by sessions · last 7 days">
+        {loading ? (
+          <div className="h-[120px] flex items-center justify-center text-sm text-paper-dim/60">
+            Loading…
+          </div>
+        ) : data && data.topStations.length > 0 ? (
+          <div className="space-y-3">
+            {data.topStations.map((s) => (
+              <div
+                key={s.id}
+                className="flex items-center gap-4 rounded-xl bg-white/[0.02] border border-white/5 px-4 py-3"
+              >
+                <div className="w-7 h-7 rounded-lg bg-white/[0.06] border border-white/10 flex items-center justify-center text-xs font-semibold text-paper-dim numeral">
+                  {s.rank}
                 </div>
-                <div className="flex items-center gap-3">
-                  <div className="flex-1 h-1.5 rounded-full bg-white/5 overflow-hidden">
-                    <motion.div
-                      className="h-full rounded-full bg-gradient-to-r from-[#4a63ff] to-[#7dedc4]"
-                      initial={{ width: 0 }}
-                      animate={{ width: `${s.utilization}%` }}
-                      transition={{ duration: 0.8, delay: 0.4, ease: [0.22, 1, 0.36, 1] }}
-                    />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <span className="text-sm font-semibold text-paper truncate">{s.name}</span>
+                    <span className="text-[10px] font-mono text-paper-dim">{s.id}</span>
                   </div>
-                  <span className="text-[11px] text-paper-dim numeral w-10 text-right">
-                    {s.utilization}%
-                  </span>
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1 h-1.5 rounded-full bg-white/5 overflow-hidden">
+                      <motion.div
+                        className="h-full rounded-full bg-gradient-to-r from-[#4a63ff] to-[#7dedc4]"
+                        initial={{ width: 0 }}
+                        animate={{ width: `${s.utilization}%` }}
+                        transition={{ duration: 0.8, delay: 0.4, ease: [0.22, 1, 0.36, 1] }}
+                      />
+                    </div>
+                    <span className="text-[11px] text-paper-dim numeral w-10 text-right">
+                      {s.utilization}%
+                    </span>
+                  </div>
+                </div>
+                <div className="text-right shrink-0">
+                  <div className="text-sm font-semibold text-paper numeral">{s.sessions}</div>
+                  <div className="text-[10px] text-paper-dim uppercase tracking-wider">sessions</div>
                 </div>
               </div>
-              <div className="text-right shrink-0">
-                <div className="text-sm font-semibold text-paper numeral">{s.sessions}</div>
-                <div className="text-[10px] text-paper-dim uppercase tracking-wider">sessions</div>
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        ) : (
+          <div className="h-[120px] flex items-center justify-center text-sm text-paper-dim/60">
+            No station activity in the last 7 days
+          </div>
+        )}
       </GlassCard>
     </div>
   );

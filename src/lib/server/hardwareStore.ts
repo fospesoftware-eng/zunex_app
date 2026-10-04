@@ -59,15 +59,29 @@ function hardwareToRow(h: Omit<HardwareConfig, "id" | "updatedAt" | "lastSeenAt"
   };
 }
 
-export async function listHardware(): Promise<HardwareConfig[]> {
+export async function listHardware(): Promise<(HardwareConfig & { deviceModel?: string; installType?: string })[]> {
   const sb = getAdminSupabase();
   if (!sb) return [];
-  const { data, error } = await sb.from("hardware").select("*").order("station_id");
-  if (error) {
-    console.error("[hardwareStore] list error:", error);
+  const [hwRes, stRes] = await Promise.all([
+    sb.from("hardware").select("*").order("station_id"),
+    sb.from("stations").select("id, device_model, install_type"),
+  ]);
+  if (hwRes.error) {
+    console.error("[hardwareStore] list error:", hwRes.error);
     return [];
   }
-  return (data ?? []).map(rowToHardware);
+  const stationMap = new Map(
+    (stRes.data ?? []).map((s) => [String(s.id), { deviceModel: s.device_model, installType: s.install_type }]),
+  );
+  return (hwRes.data ?? []).map((row) => {
+    const hw = rowToHardware(row);
+    const st = stationMap.get(hw.stationId);
+    return {
+      ...hw,
+      deviceModel: st?.deviceModel ? String(st.deviceModel) : undefined,
+      installType: st?.installType ? String(st.installType) : undefined,
+    };
+  });
 }
 
 export async function getHardware(id: string): Promise<HardwareConfig | null> {

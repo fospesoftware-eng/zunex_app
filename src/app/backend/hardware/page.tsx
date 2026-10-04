@@ -12,12 +12,10 @@ import {
   AlertCircle,
   Wifi as WifiIcon,
   WifiOff,
-  Bluetooth,
   Server,
   Cpu,
   Activity,
   Settings2,
-  MapPin,
 } from "lucide-react";
 import { PageHeader } from "@/components/backend/PageHeader";
 import { GlassCard } from "@/components/backend/GlassCard";
@@ -48,11 +46,8 @@ interface HardwareRow {
   connectionStatus: ConnectionStatus;
   telemetryEnabled: boolean;
   updatedAt: number;
-  deviceModel: DeviceModel;
-  installType: InstallType;
-  city: string;
-  lat: number;
-  lng: number;
+  deviceModel?: DeviceModel;
+  installType?: InstallType;
 }
 
 async function getHeaders(): Promise<Record<string, string>> {
@@ -169,10 +164,12 @@ export default function HardwareConfigPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded border ${modelBg[d.deviceModel]}`}>
-                    {d.deviceModel}
-                  </span>
-                  {installLabel[d.installType] && (
+                  {d.deviceModel && modelBg[d.deviceModel] && (
+                    <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded border ${modelBg[d.deviceModel]}`}>
+                      {d.deviceModel}
+                    </span>
+                  )}
+                  {d.installType && installLabel[d.installType] && (
                     <span className="text-[10px] text-paper-dim px-1.5 py-0.5 rounded bg-white/5 border border-white/10">
                       {installLabel[d.installType]}
                     </span>
@@ -231,14 +228,6 @@ export default function HardwareConfigPage() {
                   </span>
                 </div>
               </div>
-
-              {/* Location */}
-              {d.city && (
-                <div className="flex items-center gap-1.5 text-[10px] text-paper-dim/60 mb-3">
-                  <MapPin size={10} />
-                  {d.city} · {d.lat.toFixed(3)}, {d.lng.toFixed(3)}
-                </div>
-              )}
 
               {/* Action row */}
               <div className="flex items-center justify-between pt-2 border-t border-white/5">
@@ -308,8 +297,6 @@ function HardwareForm({ initial, onSaved, onClose }: HardwareFormProps) {
   const [firmwareVersion, setFirmwareVersion] = useState(initial.firmwareVersion);
   const [heartbeatIntervalMs, setHeartbeatIntervalMs] = useState<number>(initial.heartbeatIntervalMs);
   const [telemetryEnabled, setTelemetryEnabled] = useState<boolean>(initial.telemetryEnabled);
-  const [deviceModel, setDeviceModel] = useState<DeviceModel>(initial.deviceModel);
-  const [installType, setInstallType] = useState<InstallType>(initial.installType);
   const toast = useToast();
 
   const save = async (e: React.FormEvent) => {
@@ -317,7 +304,7 @@ function HardwareForm({ initial, onSaved, onClose }: HardwareFormProps) {
     if (!stationId || !deviceId) { toast.show("error", "Station and device ID are required"); return; }
     const body = {
       stationId, deviceId, brokerUrl, mqttTopic, mqttPort, username, password,
-      firmwareVersion, heartbeatIntervalMs, telemetryEnabled, deviceModel, installType,
+      firmwareVersion, heartbeatIntervalMs, telemetryEnabled,
     };
     const res = await fetch(`/api/backend/hardware/${initial.id}`, {
       method: "PATCH", headers: await authHeaders(), body: JSON.stringify(body),
@@ -332,34 +319,6 @@ function HardwareForm({ initial, onSaved, onClose }: HardwareFormProps) {
       <div className="grid grid-cols-2 gap-4">
         <TextField label="Station ID" value={stationId} onChange={(e) => setStationId(e.target.value)} required />
         <TextField label="Device ID" value={deviceId} onChange={(e) => setDeviceId(e.target.value)} required />
-      </div>
-      <div className="grid grid-cols-2 gap-4">
-        <label className="flex flex-col gap-1.5">
-          <span className="text-xs uppercase tracking-wider text-paper-dim font-medium">Device Model</span>
-          <select
-            value={deviceModel}
-            onChange={(e) => setDeviceModel(e.target.value as DeviceModel)}
-            className="h-10 rounded-xl bg-black/30 border border-white/10 px-3 text-sm text-paper focus:outline-none focus:border-[#4a63ff] focus:ring-2 focus:ring-[#4a63ff]/25"
-          >
-            <option value="core">Core (1-port basic)</option>
-            <option value="plus">Plus (2-port premium)</option>
-          </select>
-        </label>
-        <label className="flex flex-col gap-1.5">
-          <span className="text-xs uppercase tracking-wider text-paper-dim font-medium">Install Type</span>
-          <select
-            value={installType}
-            onChange={(e) => setInstallType(e.target.value as InstallType)}
-            className="h-10 rounded-xl bg-black/30 border border-white/10 px-3 text-sm text-paper focus:outline-none focus:border-[#4a63ff] focus:ring-2 focus:ring-[#4a63ff]/25"
-          >
-            <option value="car">Car</option>
-            <option value="mall">Mall</option>
-            <option value="retail">Retail</option>
-            <option value="outdoor">Outdoor</option>
-            <option value="highway">Highway</option>
-            <option value="office">Office</option>
-          </select>
-        </label>
       </div>
       <div className="h-px bg-white/10" />
       <TextField label="Broker URL" value={brokerUrl} onChange={(e) => setBrokerUrl(e.target.value)} />
