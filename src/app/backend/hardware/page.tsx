@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
+import QRCode from "qrcode";
 import {
   RefreshCw,
   Zap,
@@ -324,42 +325,86 @@ export default function HardwareConfigPage() {
 
       {/* QR Modal */}
       <Modal open={!!qrDevice} onClose={() => setQrDevice(null)} title="Device QR Code">
-        {qrDevice && (
-          <div className="flex flex-col items-center gap-4 py-2">
-            <div className="w-56 h-56 p-4 rounded-2xl bg-gradient-to-br from-[#0f1a4a] to-[#0b1024] border border-[#4a63ff]/30 shadow-[0_0_40px_rgba(74,99,255,0.15)]">
-              <img
-                src={`/api/backend/hardware/${qrDevice.id}/qr`}
-                alt={`QR for ${qrDevice.deviceId}`}
-                className="w-full h-full"
-              />
-            </div>
-            <div className="text-center space-y-1">
-              <div className="font-mono text-sm text-paper">{qrDevice.deviceId}</div>
-              <div className="text-[11px] text-paper-dim">Station {qrDevice.stationId}</div>
-            </div>
-            <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-[11px] text-paper-dim w-full">
-              <span className="text-right text-paper-dim/70">Broker</span>
-              <span className="font-mono text-paper truncate">{qrDevice.brokerUrl}:{qrDevice.mqttPort}</span>
-              <span className="text-right text-paper-dim/70">Topic</span>
-              <span className="font-mono text-paper truncate">{qrDevice.mqttTopic}</span>
-              <span className="text-right text-paper-dim/70">TLS</span>
-              <span className="font-mono text-paper">{qrDevice.useTls ? "enabled" : "disabled"}</span>
-              <span className="text-right text-paper-dim/70">Firmware</span>
-              <span className="font-mono text-paper">{qrDevice.firmwareVersion}</span>
-            </div>
-            <div className="flex items-center gap-2 pt-2 w-full">
-              <a
-                href={`/api/backend/hardware/${qrDevice.id}/qr`}
-                download={`hardware-${qrDevice.deviceId}.png`}
-                className="flex-1 inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-[#4a63ff]/15 border border-[#4a63ff]/30 text-[#a9bcff] text-sm font-medium hover:bg-[#4a63ff]/25 hover:border-[#4a63ff]/50 transition"
-              >
-                <Download size={14} /> Download PNG
-              </a>
-            </div>
-          </div>
-        )}
+        {qrDevice && <QrPanel device={qrDevice} />}
       </Modal>
     </motion.div>
+  );
+}
+
+function QrPanel({ device }: { device: HardwareRow }) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [dataUrl, setDataUrl] = useState<string>("");
+
+  useEffect(() => {
+    const payload = JSON.stringify({
+      d: device.deviceId,
+      s: device.stationId,
+      b: device.brokerUrl,
+      t: device.mqttTopic,
+      p: device.mqttPort,
+      c: device.clientId ?? device.deviceId,
+      l: device.useTls ? "tls" : "tcp",
+      f: device.firmwareVersion,
+    });
+
+    const draw = async () => {
+      try {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        await QRCode.toCanvas(canvas, payload, {
+          errorCorrectionLevel: "M",
+          margin: 1,
+          width: 320,
+          color: { dark: "#e8edff", light: "#0b1024" },
+        });
+        const url = canvas.toDataURL("image/png");
+        setDataUrl(url);
+      } catch (e) {
+        console.error("QR draw error:", e);
+      }
+    };
+    draw();
+  }, [device]);
+
+  const onDownload = () => {
+    if (!dataUrl) return;
+    const a = document.createElement("a");
+    a.href = dataUrl;
+    a.download = `hardware-${device.deviceId}.png`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
+  return (
+    <div className="flex flex-col items-center gap-4 py-2">
+      <div className="w-56 h-56 p-4 rounded-2xl bg-gradient-to-br from-[#0f1a4a] to-[#0b1024] border border-[#4a63ff]/30 shadow-[0_0_40px_rgba(74,99,255,0.15)] flex items-center justify-center">
+        <canvas ref={canvasRef} className="max-w-full max-h-full" />
+      </div>
+      <div className="text-center space-y-1">
+        <div className="font-mono text-sm text-paper">{device.deviceId}</div>
+        <div className="text-[11px] text-paper-dim">Station {device.stationId}</div>
+      </div>
+      <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-[11px] text-paper-dim w-full">
+        <span className="text-right text-paper-dim/70">Broker</span>
+        <span className="font-mono text-paper truncate">{device.brokerUrl}:{device.mqttPort}</span>
+        <span className="text-right text-paper-dim/70">Topic</span>
+        <span className="font-mono text-paper truncate">{device.mqttTopic}</span>
+        <span className="text-right text-paper-dim/70">TLS</span>
+        <span className="font-mono text-paper">{device.useTls ? "enabled" : "disabled"}</span>
+        <span className="text-right text-paper-dim/70">Firmware</span>
+        <span className="font-mono text-paper">{device.firmwareVersion}</span>
+      </div>
+      <div className="flex items-center gap-2 pt-2 w-full">
+        <button
+          onClick={onDownload}
+          disabled={!dataUrl}
+          className="flex-1 inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-[#4a63ff]/15 border border-[#4a63ff]/30 text-[#a9bcff] text-sm font-medium hover:bg-[#4a63ff]/25 hover:border-[#4a63ff]/50 transition disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <Download size={14} /> Download PNG
+        </button>
+      </div>
+    </div>
   );
 }
 
