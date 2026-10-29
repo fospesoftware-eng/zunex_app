@@ -1,6 +1,6 @@
 import { jsonError, jsonOk } from "@/lib/server/http";
 import { requireAdmin } from "@/app/api/backend/_auth";
-import { listHardware, upsertHardware } from "@/lib/server/hardwareStore";
+import { listHardware, createHardware } from "@/lib/server/hardwareStore";
 
 export const dynamic = "force-dynamic";
 
@@ -37,7 +37,7 @@ export async function POST(req: Request) {
   if (!body.stationId || !body.deviceId) {
     return jsonError("invalid_request", "stationId and deviceId are required");
   }
-  const h = await upsertHardware({
+  const h = await createHardware({
     stationId: body.stationId,
     deviceId: body.deviceId,
     brokerUrl: body.brokerUrl ?? "mqtt://broker.zunexglobal.com",

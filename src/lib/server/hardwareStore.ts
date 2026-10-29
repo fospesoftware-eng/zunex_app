@@ -100,20 +100,18 @@ export async function getHardwareByStation(stationId: string): Promise<HardwareC
   return rowToHardware(data);
 }
 
-export async function upsertHardware(
+export async function createHardware(
   data: Omit<HardwareConfig, "id" | "updatedAt" | "lastSeenAt">,
 ): Promise<HardwareConfig | null> {
   const sb = getAdminSupabase();
   if (!sb) return null;
   const row = hardwareToRow(data);
-  row.id = `hw_${data.stationId}`;
-  const { data: result, error } = await sb
-    .from("hardware")
-    .upsert(row, { onConflict: "station_id" })
-    .select()
-    .single();
+  // Generate a unique id: hw_<stationId>_<shortSuffix>
+  const suffix = data.deviceId.replace(/[^A-Za-z0-9]/g, "").slice(-6) || Math.random().toString(36).slice(2, 8);
+  row.id = `hw_${data.stationId}_${suffix}`;
+  const { data: result, error } = await sb.from("hardware").insert(row).select().single();
   if (error) {
-    console.error("[hardwareStore] upsert error:", error);
+    console.error("[hardwareStore] insert error:", error);
     return null;
   }
   return rowToHardware(result);

@@ -320,6 +320,8 @@ interface HardwareFormProps {
 
 function HardwareForm({ initial, onSaved, onClose }: HardwareFormProps) {
   const isEdit = !!initial;
+  const [stations, setStations] = useState<{ id: string; name: string }[]>([]);
+  const [stationsLoading, setStationsLoading] = useState(true);
   const [stationId, setStationId] = useState(initial?.stationId ?? "");
   const [deviceId, setDeviceId] = useState(initial?.deviceId ?? "");
   const [brokerUrl, setBrokerUrl] = useState(initial?.brokerUrl ?? "mqtt://broker.zunexglobal.com");
@@ -332,6 +334,25 @@ function HardwareForm({ initial, onSaved, onClose }: HardwareFormProps) {
   const [heartbeatIntervalMs, setHeartbeatIntervalMs] = useState<number>(initial?.heartbeatIntervalMs ?? 30000);
   const [telemetryEnabled, setTelemetryEnabled] = useState<boolean>(initial?.telemetryEnabled ?? true);
   const toast = useToast();
+
+  useEffect(() => {
+    const loadStations = async () => {
+      try {
+        const res = await fetch("/api/backend/stations", { headers: await getHeaders() });
+        const j = await res.json();
+        if (j.ok) setStations((j.data ?? []).map((s: { id: string; name: string }) => ({ id: s.id, name: s.name })));
+      } catch { /* ignore */ }
+      setStationsLoading(false);
+    };
+    loadStations();
+  }, []);
+
+  const onStationChange = (val: string) => {
+    setStationId(val);
+    if (!isEdit && val && !deviceId) {
+      setDeviceId(`ZNV-DVC-${val}-001`);
+    }
+  };
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -353,7 +374,22 @@ function HardwareForm({ initial, onSaved, onClose }: HardwareFormProps) {
   return (
     <form onSubmit={save} className="space-y-4 max-h-[75vh] overflow-y-auto pr-1">
       <div className="grid grid-cols-2 gap-4">
-        <TextField label="Station ID" value={stationId} onChange={(e) => setStationId(e.target.value)} required />
+        <label className="flex flex-col gap-1.5">
+          <span className="text-xs uppercase tracking-wider text-paper-dim font-medium">Station</span>
+          <select
+            value={stationId}
+            onChange={(e) => onStationChange(e.target.value)}
+            disabled={isEdit}
+            className={`h-10 rounded-xl bg-black/30 border border-white/10 px-3 text-sm text-paper focus:outline-none focus:border-[#4a63ff] focus:ring-2 focus:ring-[#4a63ff]/25 transition ${isEdit ? "opacity-60 cursor-not-allowed" : ""}`}
+          >
+            <option value="">{stationsLoading ? "Loading stations…" : "Select a station"}</option>
+            {stations.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.id} — {s.name}
+              </option>
+            ))}
+          </select>
+        </label>
         <TextField label="Device ID" value={deviceId} onChange={(e) => setDeviceId(e.target.value)} required />
       </div>
       <div className="h-px bg-white/10" />
