@@ -12,6 +12,8 @@ export interface HardwareConfig {
   brokerUrl: string;
   mqttTopic: string;
   mqttPort: number;
+  clientId: string;
+  useTls: boolean;
   username: string;
   password: string;
   firmwareVersion: string;
@@ -31,6 +33,8 @@ function rowToHardware(row: Record<string, unknown>): HardwareConfig {
     brokerUrl: String(row.broker_url ?? ""),
     mqttTopic: String(row.mqtt_topic ?? ""),
     mqttPort: Number(row.mqtt_port ?? 1883),
+    clientId: String(row.client_id ?? ""),
+    useTls: Boolean(row.use_tls ?? false),
     username: String(row.username ?? ""),
     password: String(row.password ?? ""),
     firmwareVersion: String(row.firmware_version ?? ""),
@@ -49,6 +53,8 @@ function hardwareToRow(h: Omit<HardwareConfig, "id" | "updatedAt" | "lastSeenAt"
     broker_url: h.brokerUrl,
     mqtt_topic: h.mqttTopic,
     mqtt_port: h.mqttPort,
+    client_id: h.clientId,
+    use_tls: h.useTls,
     username: h.username,
     password: h.password,
     firmware_version: h.firmwareVersion,
@@ -100,11 +106,27 @@ export async function getHardwareByStation(stationId: string): Promise<HardwareC
   return rowToHardware(data);
 }
 
+export async function checkDeviceIdUnique(deviceId: string, excludeId?: string): Promise<boolean> {
+  const sb = getAdminSupabase();
+  if (!sb) return true;
+  let query = sb.from("hardware").select("id", { count: "exact", head: true }).eq("device_id", deviceId);
+  if (excludeId) query = query.neq("id", excludeId);
+  const { count, error } = await query;
+  if (error) return true; // allow if we can't verify
+  return (count ?? 0) === 0;
+}
+
 export async function createHardware(
   data: Omit<HardwareConfig, "id" | "updatedAt" | "lastSeenAt">,
 ): Promise<HardwareConfig | null> {
   const sb = getAdminSupabase();
   if (!sb) return null;
+  // Device ID uniqueness check
+  const unique = await checkDeviceIdUnique(data.deviceId);
+  if (!unique) {
+    console.error("[hardwareStore] device_id already exists:", data.deviceId);
+    return null;
+  }
   const row = hardwareToRow(data);
   // Generate a unique id: hw_<stationId>_<shortSuffix>
   const suffix = data.deviceId.replace(/[^A-Za-z0-9]/g, "").slice(-6) || Math.random().toString(36).slice(2, 8);
@@ -129,6 +151,8 @@ export async function updateHardware(
   if (patch.brokerUrl !== undefined) update.broker_url = patch.brokerUrl;
   if (patch.mqttTopic !== undefined) update.mqtt_topic = patch.mqttTopic;
   if (patch.mqttPort !== undefined) update.mqtt_port = patch.mqttPort;
+  if (patch.clientId !== undefined) update.client_id = patch.clientId;
+  if (patch.useTls !== undefined) update.use_tls = patch.useTls;
   if (patch.username !== undefined) update.username = patch.username;
   if (patch.password !== undefined) update.password = patch.password;
   if (patch.firmwareVersion !== undefined) update.firmware_version = patch.firmwareVersion;

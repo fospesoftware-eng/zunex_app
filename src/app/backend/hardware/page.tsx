@@ -18,6 +18,9 @@ import {
   Settings2,
   Plus,
   Trash2,
+  QrCode,
+  Download,
+  X,
 } from "lucide-react";
 import { PageHeader } from "@/components/backend/PageHeader";
 import { GlassCard } from "@/components/backend/GlassCard";
@@ -40,6 +43,8 @@ interface HardwareRow {
   brokerUrl: string;
   mqttTopic: string;
   mqttPort: number;
+  clientId?: string;
+  useTls?: boolean;
   username: string;
   password: string;
   firmwareVersion: string;
@@ -89,6 +94,7 @@ export default function HardwareConfigPage() {
   const [loading, setLoading] = useState(true);
   const [editDevice, setEditDevice] = useState<HardwareRow | null>(null);
   const [newOpen, setNewOpen] = useState(false);
+  const [qrDevice, setQrDevice] = useState<HardwareRow | null>(null);
   const toast = useToast();
 
   const load = async () => {
@@ -264,6 +270,13 @@ export default function HardwareConfigPage() {
                 </div>
                 <div className="flex items-center gap-1.5">
                   <button
+                    onClick={() => setQrDevice(d)}
+                    className="inline-flex items-center justify-center w-7 h-7 rounded-lg text-paper-dim hover:text-[#4a63ff] hover:bg-[#4a63ff]/10 border border-transparent hover:border-[#4a63ff]/20 transition"
+                    title="Show QR code"
+                  >
+                    <QrCode size={13} />
+                  </button>
+                  <button
                     onClick={() => handleDelete(d)}
                     className="inline-flex items-center justify-center w-7 h-7 rounded-lg text-paper-dim hover:text-ember-400 hover:bg-ember-500/10 border border-transparent hover:border-ember-500/20 transition"
                     title="Delete hardware"
@@ -308,6 +321,44 @@ export default function HardwareConfigPage() {
           />
         )}
       </Modal>
+
+      {/* QR Modal */}
+      <Modal open={!!qrDevice} onClose={() => setQrDevice(null)} title="Device QR Code">
+        {qrDevice && (
+          <div className="flex flex-col items-center gap-4 py-2">
+            <div className="w-56 h-56 p-4 rounded-2xl bg-gradient-to-br from-[#0f1a4a] to-[#0b1024] border border-[#4a63ff]/30 shadow-[0_0_40px_rgba(74,99,255,0.15)]">
+              <img
+                src={`/api/backend/hardware/${qrDevice.id}/qr`}
+                alt={`QR for ${qrDevice.deviceId}`}
+                className="w-full h-full"
+              />
+            </div>
+            <div className="text-center space-y-1">
+              <div className="font-mono text-sm text-paper">{qrDevice.deviceId}</div>
+              <div className="text-[11px] text-paper-dim">Station {qrDevice.stationId}</div>
+            </div>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-[11px] text-paper-dim w-full">
+              <span className="text-right text-paper-dim/70">Broker</span>
+              <span className="font-mono text-paper truncate">{qrDevice.brokerUrl}:{qrDevice.mqttPort}</span>
+              <span className="text-right text-paper-dim/70">Topic</span>
+              <span className="font-mono text-paper truncate">{qrDevice.mqttTopic}</span>
+              <span className="text-right text-paper-dim/70">TLS</span>
+              <span className="font-mono text-paper">{qrDevice.useTls ? "enabled" : "disabled"}</span>
+              <span className="text-right text-paper-dim/70">Firmware</span>
+              <span className="font-mono text-paper">{qrDevice.firmwareVersion}</span>
+            </div>
+            <div className="flex items-center gap-2 pt-2 w-full">
+              <a
+                href={`/api/backend/hardware/${qrDevice.id}/qr`}
+                download={`hardware-${qrDevice.deviceId}.png`}
+                className="flex-1 inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-[#4a63ff]/15 border border-[#4a63ff]/30 text-[#a9bcff] text-sm font-medium hover:bg-[#4a63ff]/25 hover:border-[#4a63ff]/50 transition"
+              >
+                <Download size={14} /> Download PNG
+              </a>
+            </div>
+          </div>
+        )}
+      </Modal>
     </motion.div>
   );
 }
@@ -327,6 +378,8 @@ function HardwareForm({ initial, onSaved, onClose }: HardwareFormProps) {
   const [brokerUrl, setBrokerUrl] = useState(initial?.brokerUrl ?? "mqtt://broker.zunexglobal.com");
   const [mqttTopic, setMqttTopic] = useState(initial?.mqttTopic ?? "");
   const [mqttPort, setMqttPort] = useState<number>(initial?.mqttPort ?? 1883);
+  const [clientId, setClientId] = useState(initial?.clientId ?? "");
+  const [useTls, setUseTls] = useState<boolean>(initial?.useTls ?? false);
   const [username, setUsername] = useState(initial?.username ?? "");
   const [password, setPassword] = useState(initial?.password ?? "");
   const [showPw, setShowPw] = useState(false);
@@ -360,7 +413,8 @@ function HardwareForm({ initial, onSaved, onClose }: HardwareFormProps) {
     const body = {
       stationId, deviceId, brokerUrl,
       mqttTopic: mqttTopic || `zunex/stations/${stationId}`,
-      mqttPort, username, password,
+      mqttPort, clientId: clientId || deviceId, useTls,
+      username, password,
       firmwareVersion, heartbeatIntervalMs, telemetryEnabled,
     };
     const url = isEdit ? `/api/backend/hardware/${initial!.id}` : "/api/backend/hardware";
@@ -397,6 +451,21 @@ function HardwareForm({ initial, onSaved, onClose }: HardwareFormProps) {
       <div className="grid grid-cols-3 gap-4">
         <TextField label="MQTT Topic" className="col-span-2" value={mqttTopic} onChange={(e) => setMqttTopic(e.target.value)} />
         <NumberField label="Port" value={mqttPort} onChange={(e) => setMqttPort(Number(e.target.value))} min={1} max={65535} />
+      </div>
+      <div className="grid grid-cols-3 gap-4">
+        <TextField label="Client ID" className="col-span-2" value={clientId} onChange={(e) => setClientId(e.target.value)} placeholder="defaults to Device ID" />
+        <label className="flex flex-col gap-1.5">
+          <span className="text-xs uppercase tracking-wider text-paper-dim font-medium">TLS</span>
+          <div className="h-10 flex items-center gap-2 px-3 rounded-xl bg-black/30 border border-white/10">
+            <input
+              type="checkbox"
+              checked={useTls}
+              onChange={(e) => setUseTls(e.target.checked)}
+              className="h-4 w-4 rounded border-white/20 bg-black/30 text-[#4a63ff] focus:ring-[#4a63ff]"
+            />
+            <span className="text-sm text-paper-dim">{useTls ? "mqtts://" : "mqtt://"}</span>
+          </div>
+        </label>
       </div>
       <div className="grid grid-cols-2 gap-4">
         <TextField label="Username" value={username} onChange={(e) => setUsername(e.target.value)} />

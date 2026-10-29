@@ -1,6 +1,6 @@
 import { jsonError, jsonOk } from "@/lib/server/http";
 import { requireAdmin } from "@/app/api/backend/_auth";
-import { listHardware, createHardware } from "@/lib/server/hardwareStore";
+import { listHardware, createHardware, checkDeviceIdUnique } from "@/lib/server/hardwareStore";
 
 export const dynamic = "force-dynamic";
 
@@ -11,12 +11,14 @@ export async function GET(req: Request) {
   return jsonOk(hardware);
 }
 
-interface UpsertBody {
+interface CreateBody {
   stationId?: string;
   deviceId?: string;
   brokerUrl?: string;
   mqttTopic?: string;
   mqttPort?: number;
+  clientId?: string;
+  useTls?: boolean;
   username?: string;
   password?: string;
   firmwareVersion?: string;
@@ -28,14 +30,19 @@ interface UpsertBody {
 export async function POST(req: Request) {
   const auth = await requireAdmin(req);
   if (!auth.ok) return auth.response;
-  let body: UpsertBody;
+  let body: CreateBody;
   try {
-    body = (await req.json()) as UpsertBody;
+    body = (await req.json()) as CreateBody;
   } catch {
     return jsonError("invalid_request", "Malformed body");
   }
   if (!body.stationId || !body.deviceId) {
     return jsonError("invalid_request", "stationId and deviceId are required");
+  }
+  // Uniqueness check
+  const unique = await checkDeviceIdUnique(body.deviceId);
+  if (!unique) {
+    return jsonError("device_id_taken", `Device ID "${body.deviceId}" already exists — must be unique`, 409);
   }
   const h = await createHardware({
     stationId: body.stationId,
@@ -43,6 +50,8 @@ export async function POST(req: Request) {
     brokerUrl: body.brokerUrl ?? "mqtt://broker.zunexglobal.com",
     mqttTopic: body.mqttTopic ?? `zunex/stations/${body.stationId}`,
     mqttPort: body.mqttPort ?? 1883,
+    clientId: body.clientId ?? body.deviceId,
+    useTls: body.useTls ?? false,
     username: body.username ?? "",
     password: body.password ?? "",
     firmwareVersion: body.firmwareVersion ?? "v1.0.0",
@@ -50,6 +59,6 @@ export async function POST(req: Request) {
     connectionStatus: body.connectionStatus ?? "unknown",
     telemetryEnabled: body.telemetryEnabled ?? true,
   });
-  if (!h) return jsonError("db_error", "Failed to upsert hardware");
+  if (!h) return jsonError("db_error", "Failed to create hardware");
   return jsonOk(h, { status: 201 });
 }
