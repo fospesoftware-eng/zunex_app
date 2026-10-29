@@ -16,6 +16,8 @@ import {
   Cpu,
   Activity,
   Settings2,
+  Plus,
+  Trash2,
 } from "lucide-react";
 import { PageHeader } from "@/components/backend/PageHeader";
 import { GlassCard } from "@/components/backend/GlassCard";
@@ -86,6 +88,7 @@ export default function HardwareConfigPage() {
   const [devices, setDevices] = useState<HardwareRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [editDevice, setEditDevice] = useState<HardwareRow | null>(null);
+  const [newOpen, setNewOpen] = useState(false);
   const toast = useToast();
 
   const load = async () => {
@@ -112,6 +115,16 @@ export default function HardwareConfigPage() {
     } else toast.show("error", j.message ?? "Heartbeat failed");
   };
 
+  const handleDelete = async (d: HardwareRow) => {
+    if (!confirm(`Delete hardware for ${d.stationId}? This removes device config from DB.`)) return;
+    const res = await fetch(`/api/backend/hardware/${d.id}`, {
+      method: "DELETE", headers: await getHeaders(),
+    });
+    const j = await res.json();
+    if (j.ok) { toast.show("success", "Hardware removed"); load(); }
+    else toast.show("error", j.message ?? "Delete failed");
+  };
+
   const onlineCount = devices.filter((d) => d.connectionStatus === "online").length;
   const offlineCount = devices.filter((d) => d.connectionStatus === "offline").length;
 
@@ -130,6 +143,9 @@ export default function HardwareConfigPage() {
             </Button>
             <Button variant="ghost" size="md" onClick={triggerHeartbeat}>
               <Zap size={14} /> Simulate heartbeat
+            </Button>
+            <Button size="md" onClick={() => setNewOpen(true)}>
+              <Plus size={14} /> Add hardware
             </Button>
           </>
         }
@@ -246,12 +262,21 @@ export default function HardwareConfigPage() {
                     </span>
                   )}
                 </div>
-                <button
-                  onClick={() => setEditDevice(d)}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] text-paper-dim hover:text-white hover:bg-white/5 border border-white/10 hover:border-white/20 transition"
-                >
-                  <Settings2 size={11} /> Configure
-                </button>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => handleDelete(d)}
+                    className="inline-flex items-center justify-center w-7 h-7 rounded-lg text-paper-dim hover:text-ember-400 hover:bg-ember-500/10 border border-transparent hover:border-ember-500/20 transition"
+                    title="Delete hardware"
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                  <button
+                    onClick={() => setEditDevice(d)}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] text-paper-dim hover:text-white hover:bg-white/5 border border-white/10 hover:border-white/20 transition"
+                  >
+                    <Settings2 size={11} /> Configure
+                  </button>
+                </div>
               </div>
             </GlassCard>
           );
@@ -264,6 +289,14 @@ export default function HardwareConfigPage() {
       {!loading && !devices.length && (
         <div className="text-center text-paper-dim text-sm py-12">No hardware configs yet.</div>
       )}
+
+      {/* Add Modal */}
+      <Modal open={newOpen} onClose={() => setNewOpen(false)} title="Add hardware device">
+        <HardwareForm
+          onSaved={() => { setNewOpen(false); load(); }}
+          onClose={() => setNewOpen(false)}
+        />
+      </Modal>
 
       {/* Edit Modal */}
       <Modal open={!!editDevice} onClose={() => setEditDevice(null)} title="Device Configuration">
@@ -280,37 +313,40 @@ export default function HardwareConfigPage() {
 }
 
 interface HardwareFormProps {
-  initial: HardwareRow;
+  initial?: HardwareRow;
   onSaved: () => void;
   onClose: () => void;
 }
 
 function HardwareForm({ initial, onSaved, onClose }: HardwareFormProps) {
-  const [stationId, setStationId] = useState(initial.stationId);
-  const [deviceId, setDeviceId] = useState(initial.deviceId);
-  const [brokerUrl, setBrokerUrl] = useState(initial.brokerUrl);
-  const [mqttTopic, setMqttTopic] = useState(initial.mqttTopic);
-  const [mqttPort, setMqttPort] = useState<number>(initial.mqttPort);
-  const [username, setUsername] = useState(initial.username);
-  const [password, setPassword] = useState(initial.password);
+  const isEdit = !!initial;
+  const [stationId, setStationId] = useState(initial?.stationId ?? "");
+  const [deviceId, setDeviceId] = useState(initial?.deviceId ?? "");
+  const [brokerUrl, setBrokerUrl] = useState(initial?.brokerUrl ?? "mqtt://broker.zunexglobal.com");
+  const [mqttTopic, setMqttTopic] = useState(initial?.mqttTopic ?? "");
+  const [mqttPort, setMqttPort] = useState<number>(initial?.mqttPort ?? 1883);
+  const [username, setUsername] = useState(initial?.username ?? "");
+  const [password, setPassword] = useState(initial?.password ?? "");
   const [showPw, setShowPw] = useState(false);
-  const [firmwareVersion, setFirmwareVersion] = useState(initial.firmwareVersion);
-  const [heartbeatIntervalMs, setHeartbeatIntervalMs] = useState<number>(initial.heartbeatIntervalMs);
-  const [telemetryEnabled, setTelemetryEnabled] = useState<boolean>(initial.telemetryEnabled);
+  const [firmwareVersion, setFirmwareVersion] = useState(initial?.firmwareVersion ?? "v1.0.0");
+  const [heartbeatIntervalMs, setHeartbeatIntervalMs] = useState<number>(initial?.heartbeatIntervalMs ?? 30000);
+  const [telemetryEnabled, setTelemetryEnabled] = useState<boolean>(initial?.telemetryEnabled ?? true);
   const toast = useToast();
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!stationId || !deviceId) { toast.show("error", "Station and device ID are required"); return; }
     const body = {
-      stationId, deviceId, brokerUrl, mqttTopic, mqttPort, username, password,
+      stationId, deviceId, brokerUrl,
+      mqttTopic: mqttTopic || `zunex/stations/${stationId}`,
+      mqttPort, username, password,
       firmwareVersion, heartbeatIntervalMs, telemetryEnabled,
     };
-    const res = await fetch(`/api/backend/hardware/${initial.id}`, {
-      method: "PATCH", headers: await authHeaders(), body: JSON.stringify(body),
-    });
+    const url = isEdit ? `/api/backend/hardware/${initial!.id}` : "/api/backend/hardware";
+    const method = isEdit ? "PATCH" : "POST";
+    const res = await fetch(url, { method, headers: await authHeaders(), body: JSON.stringify(body) });
     const j = await res.json();
-    if (j.ok) { toast.show("success", "Device config updated"); onSaved(); }
+    if (j.ok) { toast.show("success", isEdit ? "Device config updated" : "Hardware added"); onSaved(); }
     else toast.show("error", j.message ?? "Failed to save");
   };
 
@@ -363,7 +399,7 @@ function HardwareForm({ initial, onSaved, onClose }: HardwareFormProps) {
       </label>
       <div className="flex justify-end gap-2 pt-2">
         <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
-        <Button type="submit">Save configuration</Button>
+        <Button type="submit">{isEdit ? "Save configuration" : "Add hardware"}</Button>
       </div>
     </form>
   );
