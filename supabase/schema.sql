@@ -51,6 +51,15 @@ create table if not exists public.hardware (
   created_at            timestamptz default now()
 );
 
+-- Columns added after initial release — idempotent ALTERs must run BEFORE
+-- the indexes and seed INSERT below (CREATE TABLE above is a no-op on existing DBs).
+alter table public.hardware add column if not exists device_type text not null default 'zunex_one';
+alter table public.hardware add column if not exists client_id text;
+alter table public.hardware add column if not exists use_tls boolean default false;
+alter table public.hardware drop constraint if exists hardware_device_type_check;
+alter table public.hardware add constraint hardware_device_type_check
+  check (device_type in ('zunex_one','zunex_plus'));
+
 create index if not exists idx_hw_station on public.hardware(station_id);
 create index if not exists idx_hw_status  on public.hardware(connection_status);
 create index if not exists idx_hw_devtype on public.hardware(device_type);
@@ -423,14 +432,8 @@ insert into public.hardware (id, station_id, device_id, device_type, broker_url,
 on conflict (id) do nothing;
 
 -- =========================================================================
--- Migrations for existing deployments (idempotent — safe to re-run)
+-- Post-seed sync for existing deployments (idempotent — safe to re-run)
 -- =========================================================================
-alter table public.hardware add column if not exists device_type text not null default 'zunex_one';
-alter table public.hardware add column if not exists client_id text;
-alter table public.hardware add column if not exists use_tls boolean default false;
-alter table public.hardware drop constraint if exists hardware_device_type_check;
-alter table public.hardware add constraint hardware_device_type_check
-  check (device_type in ('zunex_one','zunex_plus'));
 
 -- Sync device_type from the owning station's device_model (core→one, plus→plus)
 update public.hardware h
