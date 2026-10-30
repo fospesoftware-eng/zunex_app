@@ -21,6 +21,7 @@ import {
   Trash2,
   QrCode,
   Download,
+  Upload,
   X,
 } from "lucide-react";
 import { PageHeader } from "@/components/backend/PageHeader";
@@ -96,6 +97,7 @@ export default function HardwareConfigPage() {
   const [editDevice, setEditDevice] = useState<HardwareRow | null>(null);
   const [newOpen, setNewOpen] = useState(false);
   const [qrDevice, setQrDevice] = useState<HardwareRow | null>(null);
+  const [bulkOpen, setBulkOpen] = useState(false);
   const toast = useToast();
 
   const load = async () => {
@@ -150,6 +152,9 @@ export default function HardwareConfigPage() {
             </Button>
             <Button variant="ghost" size="md" onClick={triggerHeartbeat}>
               <Zap size={14} /> Simulate heartbeat
+            </Button>
+            <Button variant="ghost" size="md" onClick={() => setBulkOpen(true)}>
+              <Upload size={14} /> Bulk import
             </Button>
             <Button size="md" onClick={() => setNewOpen(true)}>
               <Plus size={14} /> Add hardware
@@ -327,7 +332,267 @@ export default function HardwareConfigPage() {
       <Modal open={!!qrDevice} onClose={() => setQrDevice(null)} title="Device QR Code">
         {qrDevice && <QrPanel device={qrDevice} />}
       </Modal>
+
+      {/* Bulk Import Modal */}
+      <Modal open={bulkOpen} onClose={() => setBulkOpen(false)} title="Bulk import hardware (CSV)">
+        <BulkImportForm
+          onDone={() => { setBulkOpen(false); load(); }}
+          onClose={() => setBulkOpen(false)}
+        />
+      </Modal>
     </motion.div>
+  );
+}
+
+/* ── Bulk CSV Import ──────────────────────────────────────────────────── */
+
+interface CsvRow {
+  deviceId: string;
+  stationId: string;
+  brokerUrl: string;
+  mqttPort: string;
+  mqttTopic: string;
+  clientId: string;
+  useTls: string;
+  username: string;
+  password: string;
+  firmwareVersion: string;
+  heartbeatIntervalMs: string;
+  telemetryEnabled: string;
+}
+
+interface ImportResult {
+  row: number;
+  deviceId: string;
+  ok: boolean;
+  error?: string;
+}
+
+const CSV_HEADERS = [
+  "device_id", "station_id", "broker_url", "mqtt_port", "mqtt_topic",
+  "client_id", "use_tls", "username", "password", "firmware_version",
+  "heartbeat_ms", "telemetry_enabled",
+];
+
+const CSV_TEMPLATE = `${CSV_HEADERS.join(",")}
+ZXN-DVC-ZNX-A1-001,ZNX-A1,mqtt://broker.zunexglobal.com,1883,,,false,,,v1.0.0,30000,true
+ZXN-DVC-ZNX-A1-002,ZNX-A1,mqtts://broker.zunexglobal.com,8883,,,true,,,v1.0.0,30000,true`;
+
+function parseCsv(text: string): { rows: CsvRow[]; error?: string } {
+  const lines = text.split(/\r?\n/).filter((l) => l.trim());
+  if (lines.length < 2) return { rows: [], error: "CSV must have a header row + at least 1 data row" };
+  const headers = lines[0].split(",").map((h) => h.trim().toLowerCase().replace(/^\uFEFF/, ""));
+  const di = headers.indexOf("device_id");
+  const si = headers.indexOf("station_id");
+  if (di === -1 || si === -1) return { rows: [], error: "CSV must contain device_id and station_id columns" };
+
+  const idx = (name: string) => headers.indexOf(name);
+  const rows: CsvRow[] = [];
+  for (let i = 1; i < lines.length; i++) {
+    const cols = lines[i].split(",").map((c) => c.trim());
+    if (cols.every((c) => !c)) continue;
+    const get = (name: string) => (idx(name) >= 0 ? cols[idx(name)] ?? "" : "");
+    rows.push({
+      deviceId: get("device_id"),
+      stationId: get("station_id"),
+      brokerUrl: get("broker_url"),
+      mqttPort: get("mqtt_port"),
+      mqttTopic: get("mqtt_topic"),
+      clientId: get("client_id"),
+      useTls: get("use_tls"),
+      username: get("username"),
+      password: get("password"),
+      firmwareVersion: get("firmware_version"),
+      heartbeatIntervalMs: get("heartbeat_ms"),
+      telemetryEnabled: get("telemetry_enabled"),
+    });
+  }
+  if (rows.length === 0) return { rows: [], error: "No data rows found" };
+  return { rows };
+}
+
+function BulkImportForm({ onDone, onClose }: { onDone: () => void; onClose: () => void }) {
+  const [rows, setRows] = useState<CsvRow[]>([]);
+  const [parseError, setParseError] = useState("");
+  const [fileName, setFileName] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [results, setResults] = useState<ImportResult[] | null>(null);
+  const [summary, setResultsMeta] = useState<{ created: number; failed: number } | null>(null);
+  const toast = useToast();
+
+  const handleFile = (file: File) => {
+    setFileName(file.name);
+    setResults(null);
+    setResultsMeta(null);
+    const reader = new FileReader();
+    reader.onload = () => {
+      const parsed = parseCsv(String(reader.result ?? ""));
+      if (parsed.error) {
+        setRows([]);
+        setParseError(parsed.error);
+      } else {
+        setRows(parsed.rows);
+        setParseError("");
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const downloadTemplate = () => {
+    const blob = new Blob([CSV_TEMPLATE], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "zunex-hardware-template.csv";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const submit = async () => {
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/backend/hardware/bulk", {
+        method: "POST",
+        headers: await authHeaders(),
+        body: JSON.stringify({ rows }),
+      });
+      const j = await res.json();
+      if (j.ok) {
+        setResults(j.data.results);
+        setResultsMeta({ created: j.data.created, failed: j.data.failed });
+        if (j.data.created > 0) {
+          toast.show("success", `Imported ${j.data.created} device${j.data.created !== 1 ? "s" : ""}`);
+        }
+        if (j.data.failed > 0) {
+          toast.show("error", `${j.data.failed} row${j.data.failed !== 1 ? "s" : ""} failed`);
+        }
+      } else {
+        toast.show("error", j.message ?? "Import failed");
+      }
+    } catch {
+      toast.show("error", "Import failed — network error");
+    }
+    setSubmitting(false);
+  };
+
+  return (
+    <div className="space-y-4 max-h-[75vh] overflow-y-auto pr-1">
+      {/* Template + upload */}
+      <div className="flex items-center gap-2">
+        <button
+          onClick={downloadTemplate}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-paper-dim hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 transition"
+        >
+          <Download size={12} /> Download CSV template
+        </button>
+        <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs cursor-pointer bg-[#4a63ff]/15 border border-[#4a63ff]/30 text-[#a9bcff] hover:bg-[#4a63ff]/25 hover:border-[#4a63ff]/50 transition">
+          <Upload size={12} /> {fileName || "Choose CSV file"}
+          <input
+            type="file"
+            accept=".csv,text/csv"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) handleFile(f);
+              e.target.value = "";
+            }}
+          />
+        </label>
+      </div>
+
+      {parseError && (
+        <div className="flex items-start gap-2 p-3 rounded-xl bg-ember-500/10 border border-ember-500/25 text-ember-400 text-xs">
+          <AlertCircle size={14} className="shrink-0 mt-0.5" />
+          <span>{parseError}</span>
+        </div>
+      )}
+
+      {/* Column reference */}
+      <div className="p-3 rounded-xl bg-white/[0.03] border border-white/5 text-[11px] text-paper-dim/80 leading-relaxed">
+        <span className="text-paper-dim font-medium">Columns:</span>{" "}
+        <code className="font-mono text-[#a9bcff]">{CSV_HEADERS.join(", ")}</code>
+        <br />
+        Only <code className="font-mono text-[#a9bcff]">device_id</code> and{" "}
+        <code className="font-mono text-[#a9bcff]">station_id</code> are required. Empty cells use defaults
+        (broker mqtt://broker.zunexglobal.com, port 1883, topic auto, firmware v1.0.0, heartbeat 30000, telemetry on).
+      </div>
+
+      {/* Preview */}
+      {rows.length > 0 && !results && (
+        <>
+          <div className="text-xs text-paper-dim font-medium">
+            Preview — {rows.length} row{rows.length !== 1 ? "s" : ""} ready
+          </div>
+          <div className="rounded-xl border border-white/10 overflow-hidden">
+            <table className="w-full text-[11px]">
+              <thead>
+                <tr className="bg-white/[0.04] text-paper-dim/70 uppercase tracking-wider">
+                  <th className="text-left px-3 py-2 font-medium">#</th>
+                  <th className="text-left px-3 py-2 font-medium">Device ID</th>
+                  <th className="text-left px-3 py-2 font-medium">Station</th>
+                  <th className="text-left px-3 py-2 font-medium">Broker</th>
+                  <th className="text-left px-3 py-2 font-medium">Port</th>
+                  <th className="text-left px-3 py-2 font-medium">TLS</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.slice(0, 12).map((r, i) => (
+                  <tr key={i} className="border-t border-white/5 text-paper-dim">
+                    <td className="px-3 py-1.5 text-paper-dim/50">{i + 1}</td>
+                    <td className="px-3 py-1.5 font-mono text-paper">{r.deviceId || <span className="text-ember-400">missing</span>}</td>
+                    <td className="px-3 py-1.5 font-mono">{r.stationId || <span className="text-ember-400">missing</span>}</td>
+                    <td className="px-3 py-1.5 font-mono truncate max-w-[160px]">{r.brokerUrl || <span className="text-paper-dim/40">default</span>}</td>
+                    <td className="px-3 py-1.5 font-mono">{r.mqttPort || "1883"}</td>
+                    <td className="px-3 py-1.5 font-mono">{r.useTls || "false"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {rows.length > 12 && (
+              <div className="px-3 py-2 text-[11px] text-paper-dim/50 bg-white/[0.02] border-t border-white/5">
+                … and {rows.length - 12} more
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
+      {/* Results */}
+      {results && summary && (
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <Pill variant="success">{summary.created} imported</Pill>
+            {summary.failed > 0 && <Pill variant="error">{summary.failed} failed</Pill>}
+          </div>
+          {summary.failed > 0 && (
+            <div className="rounded-xl border border-ember-500/20 bg-ember-500/5 divide-y divide-ember-500/10 max-h-40 overflow-y-auto">
+              {results.filter((r) => !r.ok).map((r) => (
+                <div key={r.row} className="px-3 py-2 text-[11px] flex items-center gap-2">
+                  <AlertCircle size={12} className="text-ember-400 shrink-0" />
+                  <span className="font-mono text-paper-dim/60">row {r.row}</span>
+                  <span className="font-mono text-paper truncate">{r.deviceId}</span>
+                  <span className="text-ember-400 ml-auto">{r.error}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Actions */}
+      <div className="flex justify-end gap-2 pt-2">
+        <Button type="button" variant="ghost" onClick={results ? onDone : onClose}>
+          {results ? "Done" : "Cancel"}
+        </Button>
+        {!results && (
+          <Button type="button" onClick={submit} disabled={rows.length === 0 || submitting}>
+            {submitting ? "Importing…" : `Import ${rows.length} device${rows.length !== 1 ? "s" : ""}`}
+          </Button>
+        )}
+      </div>
+    </div>
   );
 }
 

@@ -139,6 +139,59 @@ export async function createHardware(
   return rowToHardware(result);
 }
 
+export interface BulkHardwareInput {
+  stationId: string;
+  deviceId: string;
+  brokerUrl: string;
+  mqttTopic: string;
+  mqttPort: number;
+  clientId: string;
+  useTls: boolean;
+  username: string;
+  password: string;
+  firmwareVersion: string;
+  heartbeatIntervalMs: number;
+  telemetryEnabled: boolean;
+}
+
+export async function createHardwareBulk(
+  inputs: BulkHardwareInput[],
+): Promise<HardwareConfig[]> {
+  const sb = getAdminSupabase();
+  if (!sb) return [];
+  const rows = inputs.map((data) => {
+    const row = hardwareToRow({
+      ...data,
+      connectionStatus: "unknown" as ConnectionStatus,
+    });
+    const suffix = data.deviceId.replace(/[^A-Za-z0-9]/g, "").slice(-6) || Math.random().toString(36).slice(2, 8);
+    row.id = `hw_${data.stationId}_${suffix}`;
+    return row;
+  });
+  const { data, error } = await sb.from("hardware").insert(rows).select();
+  if (error) {
+    console.error("[hardwareStore] bulk insert error:", error);
+    return [];
+  }
+  return (data ?? []).map(rowToHardware);
+}
+
+export async function getExistingDeviceIds(deviceIds: string[]): Promise<Set<string>> {
+  const sb = getAdminSupabase();
+  if (!sb || deviceIds.length === 0) return new Set();
+  const { data, error } = await sb.from("hardware").select("device_id").in("device_id", deviceIds);
+  if (error) return new Set();
+  return new Set((data ?? []).map((r) => String(r.device_id)));
+}
+
+export async function getExistingStationIds(stationIds: string[]): Promise<Set<string>> {
+  const sb = getAdminSupabase();
+  if (!sb || stationIds.length === 0) return new Set();
+  const { data, error } = await sb.from("stations").select("id").in("id", stationIds);
+  if (error) return new Set();
+  return new Set((data ?? []).map((r) => String(r.id)));
+}
+
 export async function updateHardware(
   id: string,
   patch: Partial<Omit<HardwareConfig, "id">>,
