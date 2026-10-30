@@ -1,20 +1,20 @@
 // ---------------------------------------------------------------------------
-// Fire-and-forget DB sync. Every in-memory session mutation we also try to
-// write to Supabase so the LiveDB mirrors the server state. Silent on RLS
-// blocks (publishable key can't write by design — a future service_role key
-// makes these writes stick). Never blocks the request path.
+// Fire-and-forget DB sync. Every in-memory session mutation we also write to
+// Supabase so the LiveDB mirrors server state. Uses the service-role client
+// (RLS is enabled on `sessions`; the publishable key cannot write by design).
+// Never blocks the request path.
 // ---------------------------------------------------------------------------
 
-import { getServerSupabase } from "@/lib/server/supabase";
+import { getAdminSupabase } from "@/lib/server/supabase";
 import type { SessionRecord } from "@/lib/server/store";
 
 const THROTTLED = new Set<string>();
 let lastWarnAt = 0;
 const WARN_INTERVAL_MS = 60_000;
 
-/** Upsert a session row — best effort, silent fail. */
+/** Upsert a session row — best effort, never throws. */
 export function syncSessionToDb(s: SessionRecord): void {
-  const supabase = getServerSupabase();
+  const supabase = getAdminSupabase();
   if (!supabase) return;
   const key = `${s.id}:${s.state}`;
   if (THROTTLED.has(key)) return;
@@ -42,10 +42,7 @@ export function syncSessionToDb(s: SessionRecord): void {
         const now = Date.now();
         if (now - lastWarnAt > WARN_INTERVAL_MS) {
           lastWarnAt = now;
-          // RLS "violates row-level security policy" is expected with publishable-only key
-          if (!error.message?.includes("row-level security")) {
-            console.warn("[db] session upsert error:", error.message);
-          }
+          console.warn("[db] session upsert error:", error.message);
         }
       }
     });

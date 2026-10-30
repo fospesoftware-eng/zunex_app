@@ -445,3 +445,35 @@ where h.station_id = s.id;
 insert into public.admin_config (key, value) values
   ('media_server', '{"baseUrl":"https://media.zunexglobal.com/ads","apiKey":""}'::jsonb)
 on conflict (key) do nothing;
+
+-- =========================================================================
+-- Row-Level Security hardening (idempotent — safe to re-run)
+--
+-- Model: all server-side access uses the service-role key (bypasses RLS).
+-- The browser publishable key may ONLY:
+--   - read public.stations            (public station directory)
+--   - read its own row in public.admins (login role check — policy above)
+-- Everything else is locked: no policies => no anon/authenticated access.
+-- =========================================================================
+
+-- stations: public read, no public writes
+alter table public.stations enable row level security;
+drop policy if exists "stations public read" on public.stations;
+create policy "stations public read" on public.stations
+  for select to anon, authenticated
+  using (true);
+
+-- everything else: enable RLS with zero public policies (service-role only)
+alter table public.hardware           enable row level security;
+alter table public.sessions           enable row level security;
+alter table public.station_heartbeats enable row level security;
+alter table public.admin_config       enable row level security;
+alter table public.media_assets       enable row level security;
+alter table public.playlists          enable row level security;
+alter table public.playlist_items     enable row level security;
+alter table public.device_playlists   enable row level security;
+alter table public.playback_logs      enable row level security;
+alter table public.tickets            enable row level security;
+alter table public.api_keys           enable row level security;
+alter table public.notifications      enable row level security;
+alter table public.audit_log          enable row level security;

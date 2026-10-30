@@ -1,4 +1,5 @@
 import type { PortTelemetry, StationTelemetry } from "@/lib/core/types";
+import { getAdminSupabase } from "@/lib/server/supabase";
 
 // mqtt is imported lazily so a failed/absent install never breaks the app —
 // the mock hardware keeps everything running when no broker is configured.
@@ -60,6 +61,38 @@ function applyPortTelemetry(port: PortTelemetry): void {
   existing.online = true;
   existing.lastSeenAt = Date.now();
   telemetryByStation.set(port.stationId, existing);
+  persistHeartbeat(port);
+}
+
+// ---------------------------------------------------------------------------
+// Heartbeat persistence — append live telemetry into public.station_heartbeats
+// (throttled to 1 row/min/station so a chatty fleet can't flood the table).
+// Fire-and-forget; never blocks the MQTT message path.
+// ---------------------------------------------------------------------------
+
+const HEARTBEAT_PERSIST_INTERVAL_MS = 60_000;
+const lastHeartbeatPersistAt = new Map<string, number>();
+
+function persistHeartbeat(port: PortTelemetry): void {
+  const sb = getAdminSupabase();
+  if (!sb) return;
+  const now = Date.now();
+  const last = lastHeartbeatPersistAt.get(port.stationId) ?? 0;
+  if (now - last < HEARTBEAT_PERSIST_INTERVAL_MS) return;
+  lastHeartbeatPersistAt.set(port.stationId, now);
+  void sb
+    .from("station_heartbeats")
+    .insert({
+      station_id: port.stationId,
+      ts: new Date(now).toISOString(),
+      power_kw: port.powerWatts != null ? port.powerWatts / 1000 : null,
+      voltage: port.voltage ?? null,
+      connector_state: port.charging ? "charging" : port.connected ? "connected" : "idle",
+      firmware: null,
+    })
+    .then(({ error }) => {
+      if (error) console.warn("[mqtt] heartbeat persist error:", error.message);
+    });
 }
 
 function applyStationStatus(stationId: string, online: boolean): void {

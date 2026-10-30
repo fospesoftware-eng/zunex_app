@@ -87,11 +87,8 @@ export function ActivityFeed() {
     };
   }, []);
 
-  // Generate mock events if real API returns empty
-  const displayEvents =
-    events.length > 0
-      ? events
-      : generateMockEvents();
+  // Production: show real sessions only — never fabricate activity.
+  const displayEvents = events;
 
   return (
     <div className="flex flex-col h-full">
@@ -112,6 +109,14 @@ export function ActivityFeed() {
 
       {/* Event list */}
       <div className="flex-1 space-y-2 overflow-hidden">
+        {displayEvents.length === 0 && (
+          <div className="flex h-full flex-col items-center justify-center rounded-xl border border-dashed border-white/10 bg-white/[0.02] px-4 py-8 text-center">
+            <span className="text-[12px] font-medium text-paper-dim/70">No charging sessions yet</span>
+            <span className="mt-1 text-[11px] text-paper-dim/40">
+              Live sessions will appear here automatically as drivers start charging.
+            </span>
+          </div>
+        )}
         <AnimatePresence initial={false}>
           {displayEvents.map((ev, idx) => {
             const color = getEventColor(ev.state);
@@ -155,25 +160,4 @@ export function ActivityFeed() {
       </div>
     </div>
   );
-}
-
-// Fallback mock events
-let mockIdx = 0;
-function generateMockEvents(): SessionEvent[] {
-  const stations = ["ZNX-PL-01", "ZNX-BA-03", "ZNX-KR-05", "ZNX-KS-02"];
-  const states = ["charging_active", "payment_pending", "completed", "charging_active", "paid"];
-  const plans = ["15min-10", "30min-18", "45min-25", "60min-35"];
-  const now = Date.now();
-
-  return Array.from({ length: 8 }).map((_, i) => {
-    mockIdx++;
-    const minsAgo = i * 2 + Math.random() * 3;
-    return {
-      id: `sess-${mockIdx}-${Math.random().toString(36).slice(2, 8)}`,
-      stationId: stations[(mockIdx + i) % stations.length],
-      state: states[(mockIdx + i) % states.length],
-      planId: plans[(mockIdx + i) % plans.length],
-      createdAt: now - minsAgo * 60000,
-    };
-  });
 }
