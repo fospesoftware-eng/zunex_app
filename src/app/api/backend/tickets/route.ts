@@ -1,6 +1,12 @@
 import { jsonError, jsonOk } from "@/lib/server/http";
 import { requireAdmin } from "@/app/api/backend/_auth";
-import { createTicket, listTickets } from "@/lib/server/ticketStore";
+import {
+  createTicket,
+  listTickets,
+  type TicketPriority,
+  type TicketStatus,
+} from "@/lib/server/ticketStore";
+import { logAudit } from "@/lib/server/audit";
 
 export const dynamic = "force-dynamic";
 
@@ -9,12 +15,12 @@ export async function GET(req: Request) {
   if (!auth.ok) return auth.response;
   const url = new URL(req.url);
   const filter = {
-    status: (url.searchParams.get("status") as ReturnType<typeof listTickets>[number]["status"]) ?? undefined,
-    priority: (url.searchParams.get("priority") as ReturnType<typeof listTickets>[number]["priority"]) ?? undefined,
+    status: (url.searchParams.get("status") as TicketStatus | null) ?? undefined,
+    priority: (url.searchParams.get("priority") as TicketPriority | null) ?? undefined,
     stationId: url.searchParams.get("stationId") ?? undefined,
     search: url.searchParams.get("search") ?? undefined,
   };
-  return jsonOk(listTickets(filter));
+  return jsonOk(await listTickets(filter));
 }
 
 interface CreateBody {
@@ -40,7 +46,7 @@ export async function POST(req: Request) {
   if (!body.subject || !body.description || !body.requesterName || !body.requesterEmail) {
     return jsonError("invalid_request", "subject, description, requesterName and requesterEmail are required");
   }
-  const t = createTicket({
+  const t = await createTicket({
     subject: body.subject,
     description: body.description,
     priority: body.priority ?? "medium",
@@ -50,5 +56,7 @@ export async function POST(req: Request) {
     stationId: body.stationId ?? null,
     assignee: body.assignee ?? null,
   });
+  if (!t) return jsonError("create_failed", "Failed to create ticket", 500);
+  await logAudit(auth.admin.email, "ticket-created", `Ticket: ${t.subject}`, t.id);
   return jsonOk(t, { status: 201 });
 }

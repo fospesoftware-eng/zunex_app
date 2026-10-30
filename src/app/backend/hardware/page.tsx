@@ -23,6 +23,7 @@ import {
   Download,
   Upload,
   X,
+  MonitorPlay,
 } from "lucide-react";
 import { PageHeader } from "@/components/backend/PageHeader";
 import { GlassCard } from "@/components/backend/GlassCard";
@@ -35,6 +36,7 @@ import { useToast } from "@/components/backend/Toast";
 import { getAccessToken } from "@/lib/client/backendAuth";
 
 type ConnectionStatus = "online" | "offline" | "connecting" | "unknown";
+type DeviceType = "zunex_one" | "zunex_plus";
 type DeviceModel = "core" | "plus";
 type InstallType = "car" | "mall" | "retail" | "outdoor" | "highway" | "office";
 
@@ -42,6 +44,7 @@ interface HardwareRow {
   id: string;
   stationId: string;
   deviceId: string;
+  deviceType: DeviceType;
   brokerUrl: string;
   mqttTopic: string;
   mqttPort: number;
@@ -82,9 +85,17 @@ function fmtLastSeen(ts: number | null) {
   return new Date(ts).toLocaleString();
 }
 
-const modelBg: Record<DeviceModel, string> = {
-  core: "bg-[#4a63ff]/20 text-[#a9bcff] border-[#4a63ff]/40",
-  plus: "bg-[#a855f7]/20 text-[#d8b4fe] border-[#a855f7]/40",
+const deviceTypeMeta: Record<DeviceType, { label: string; badge: string; hint: string }> = {
+  zunex_one: {
+    label: "Zunex One",
+    hint: "Charging controller — no display",
+    badge: "bg-[#4a63ff]/20 text-[#a9bcff] border-[#4a63ff]/40",
+  },
+  zunex_plus: {
+    label: "Zunex Plus",
+    hint: "Inbuilt video player · plays ads from media server",
+    badge: "bg-[#a855f7]/20 text-[#d8b4fe] border-[#a855f7]/40",
+  },
 };
 
 const installLabel: Record<InstallType, string> = {
@@ -98,6 +109,7 @@ export default function HardwareConfigPage() {
   const [newOpen, setNewOpen] = useState(false);
   const [qrDevice, setQrDevice] = useState<HardwareRow | null>(null);
   const [bulkOpen, setBulkOpen] = useState(false);
+  const [typeFilter, setTypeFilter] = useState<"all" | DeviceType>("all");
   const toast = useToast();
 
   const load = async () => {
@@ -136,6 +148,9 @@ export default function HardwareConfigPage() {
 
   const onlineCount = devices.filter((d) => d.connectionStatus === "online").length;
   const offlineCount = devices.filter((d) => d.connectionStatus === "offline").length;
+  const plusCount = devices.filter((d) => d.deviceType === "zunex_plus").length;
+  const oneCount = devices.filter((d) => d.deviceType === "zunex_one").length;
+  const filtered = typeFilter === "all" ? devices : devices.filter((d) => d.deviceType === typeFilter);
 
   return (
     <motion.div initial={{ opacity: 1 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}>
@@ -163,16 +178,35 @@ export default function HardwareConfigPage() {
         }
       />
 
-      {/* Summary stats */}
-      <div className="flex items-center gap-3 mb-6">
+      {/* Summary stats + device type filter */}
+      <div className="flex flex-wrap items-center gap-3 mb-6">
         <Pill variant="info">{devices.length} devices</Pill>
         <Pill variant="success">{onlineCount} connected</Pill>
         <Pill variant="error">{offlineCount} disconnected</Pill>
+        <div className="ml-auto inline-flex rounded-xl border border-white/10 bg-black/20 p-1">
+          {([["all", `All · ${devices.length}`], ["zunex_one", `Zunex One · ${oneCount}`], ["zunex_plus", `Zunex Plus · ${plusCount}`]] as const).map(([key, label]) => (
+            <button
+              key={key}
+              onClick={() => setTypeFilter(key)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
+                typeFilter === key
+                  ? key === "zunex_plus"
+                    ? "bg-[#a855f7]/20 text-[#d8b4fe] border border-[#a855f7]/40"
+                    : key === "zunex_one"
+                      ? "bg-[#4a63ff]/20 text-[#a9bcff] border border-[#4a63ff]/40"
+                      : "bg-white/10 text-paper border border-white/20"
+                  : "text-paper-dim hover:text-paper border border-transparent"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Cards grid */}
       <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-5">
-        {devices.map((d) => {
+        {filtered.map((d) => {
           const isOnline = d.connectionStatus === "online";
           return (
             <GlassCard key={d.id} className="hover:border-[#4a63ff]/30 transition-all duration-200">
@@ -192,11 +226,12 @@ export default function HardwareConfigPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  {d.deviceModel && modelBg[d.deviceModel] && (
-                    <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded border ${modelBg[d.deviceModel]}`}>
-                      {d.deviceModel}
-                    </span>
-                  )}
+                  <span
+                    className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded border ${deviceTypeMeta[d.deviceType ?? "zunex_one"].badge}`}
+                    title={deviceTypeMeta[d.deviceType ?? "zunex_one"].hint}
+                  >
+                    {deviceTypeMeta[d.deviceType ?? "zunex_one"].label}
+                  </span>
                   {d.installType && installLabel[d.installType] && (
                     <span className="text-[10px] text-paper-dim px-1.5 py-0.5 rounded bg-white/5 border border-white/10">
                       {installLabel[d.installType]}
@@ -275,6 +310,15 @@ export default function HardwareConfigPage() {
                   )}
                 </div>
                 <div className="flex items-center gap-1.5">
+                  {d.deviceType === "zunex_plus" && (
+                    <Link
+                      href={`/backend/media?device=${d.id}`}
+                      className="inline-flex items-center justify-center w-7 h-7 rounded-lg text-paper-dim hover:text-[#d8b4fe] hover:bg-[#a855f7]/10 border border-transparent hover:border-[#a855f7]/25 transition"
+                      title="Manage ad playlist (Media Ads)"
+                    >
+                      <MonitorPlay size={13} />
+                    </Link>
+                  )}
                   <button
                     onClick={() => setQrDevice(d)}
                     className="inline-flex items-center justify-center w-7 h-7 rounded-lg text-paper-dim hover:text-[#4a63ff] hover:bg-[#4a63ff]/10 border border-transparent hover:border-[#4a63ff]/20 transition"
@@ -307,6 +351,11 @@ export default function HardwareConfigPage() {
       )}
       {!loading && !devices.length && (
         <div className="text-center text-paper-dim text-sm py-12">No hardware configs yet.</div>
+      )}
+      {!loading && devices.length > 0 && filtered.length === 0 && (
+        <div className="text-center text-paper-dim text-sm py-12">
+          No {typeFilter === "zunex_plus" ? "Zunex Plus" : "Zunex One"} devices.
+        </div>
       )}
 
       {/* Add Modal */}
@@ -349,6 +398,7 @@ export default function HardwareConfigPage() {
 interface CsvRow {
   deviceId: string;
   stationId: string;
+  deviceType: string;
   brokerUrl: string;
   mqttPort: string;
   mqttTopic: string;
@@ -369,14 +419,14 @@ interface ImportResult {
 }
 
 const CSV_HEADERS = [
-  "device_id", "station_id", "broker_url", "mqtt_port", "mqtt_topic",
+  "device_id", "station_id", "device_type", "broker_url", "mqtt_port", "mqtt_topic",
   "client_id", "use_tls", "username", "password", "firmware_version",
   "heartbeat_ms", "telemetry_enabled",
 ];
 
 const CSV_TEMPLATE = `${CSV_HEADERS.join(",")}
-ZXN-DVC-ZNX-A1-001,ZNX-A1,mqtt://broker.zunexglobal.com,1883,,,false,,,v1.0.0,30000,true
-ZXN-DVC-ZNX-A1-002,ZNX-A1,mqtts://broker.zunexglobal.com,8883,,,true,,,v1.0.0,30000,true`;
+ZXN-DVC-ZNX-A1-001,ZNX-A1,zunex_plus,mqtt://broker.zunexglobal.com,1883,,,false,,,v1.0.0,30000,true
+ZXN-DVC-ZNX-A1-002,ZNX-A1,zunex_one,mqtts://broker.zunexglobal.com,8883,,,true,,,v1.0.0,30000,true`;
 
 function parseCsv(text: string): { rows: CsvRow[]; error?: string } {
   const lines = text.split(/\r?\n/).filter((l) => l.trim());
@@ -395,6 +445,7 @@ function parseCsv(text: string): { rows: CsvRow[]; error?: string } {
     rows.push({
       deviceId: get("device_id"),
       stationId: get("station_id"),
+      deviceType: get("device_type"),
       brokerUrl: get("broker_url"),
       mqttPort: get("mqtt_port"),
       mqttTopic: get("mqtt_topic"),
@@ -516,7 +567,7 @@ function BulkImportForm({ onDone, onClose }: { onDone: () => void; onClose: () =
         <br />
         Only <code className="font-mono text-[#a9bcff]">device_id</code> and{" "}
         <code className="font-mono text-[#a9bcff]">station_id</code> are required. Empty cells use defaults
-        (broker mqtt://broker.zunexglobal.com, port 1883, topic auto, firmware v1.0.0, heartbeat 30000, telemetry on).
+        (type zunex_one, broker mqtt://broker.zunexglobal.com, port 1883, topic auto, firmware v1.0.0, heartbeat 30000, telemetry on).
       </div>
 
       {/* Preview */}
@@ -532,6 +583,7 @@ function BulkImportForm({ onDone, onClose }: { onDone: () => void; onClose: () =
                   <th className="text-left px-3 py-2 font-medium">#</th>
                   <th className="text-left px-3 py-2 font-medium">Device ID</th>
                   <th className="text-left px-3 py-2 font-medium">Station</th>
+                  <th className="text-left px-3 py-2 font-medium">Type</th>
                   <th className="text-left px-3 py-2 font-medium">Broker</th>
                   <th className="text-left px-3 py-2 font-medium">Port</th>
                   <th className="text-left px-3 py-2 font-medium">TLS</th>
@@ -543,6 +595,7 @@ function BulkImportForm({ onDone, onClose }: { onDone: () => void; onClose: () =
                     <td className="px-3 py-1.5 text-paper-dim/50">{i + 1}</td>
                     <td className="px-3 py-1.5 font-mono text-paper">{r.deviceId || <span className="text-ember-400">missing</span>}</td>
                     <td className="px-3 py-1.5 font-mono">{r.stationId || <span className="text-ember-400">missing</span>}</td>
+                    <td className="px-3 py-1.5 font-mono">{r.deviceType || "zunex_one"}</td>
                     <td className="px-3 py-1.5 font-mono truncate max-w-[160px]">{r.brokerUrl || <span className="text-paper-dim/40">default</span>}</td>
                     <td className="px-3 py-1.5 font-mono">{r.mqttPort || "1883"}</td>
                     <td className="px-3 py-1.5 font-mono">{r.useTls || "false"}</td>
@@ -604,6 +657,7 @@ function QrPanel({ device }: { device: HardwareRow }) {
     const payload = JSON.stringify({
       d: device.deviceId,
       s: device.stationId,
+      m: device.deviceType,
       b: device.brokerUrl,
       t: device.mqttTopic,
       p: device.mqttPort,
@@ -648,7 +702,9 @@ function QrPanel({ device }: { device: HardwareRow }) {
       </div>
       <div className="text-center space-y-1">
         <div className="font-mono text-sm text-paper">{device.deviceId}</div>
-        <div className="text-[11px] text-paper-dim">Station {device.stationId}</div>
+        <div className="text-[11px] text-paper-dim">
+          Station {device.stationId} · {deviceTypeMeta[device.deviceType ?? "zunex_one"].label}
+        </div>
       </div>
       <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-[11px] text-paper-dim w-full">
         <span className="text-right text-paper-dim/70">Broker</span>
@@ -685,6 +741,7 @@ function HardwareForm({ initial, onSaved, onClose }: HardwareFormProps) {
   const [stationsLoading, setStationsLoading] = useState(true);
   const [stationId, setStationId] = useState(initial?.stationId ?? "");
   const [deviceId, setDeviceId] = useState(initial?.deviceId ?? "");
+  const [deviceType, setDeviceType] = useState<DeviceType>(initial?.deviceType ?? "zunex_one");
   const [brokerUrl, setBrokerUrl] = useState(initial?.brokerUrl ?? "mqtt://broker.zunexglobal.com");
   const [mqttTopic, setMqttTopic] = useState(initial?.mqttTopic ?? "");
   const [mqttPort, setMqttPort] = useState<number>(initial?.mqttPort ?? 1883);
@@ -721,7 +778,7 @@ function HardwareForm({ initial, onSaved, onClose }: HardwareFormProps) {
     e.preventDefault();
     if (!stationId || !deviceId) { toast.show("error", "Station and device ID are required"); return; }
     const body = {
-      stationId, deviceId, brokerUrl,
+      stationId, deviceId, deviceType, brokerUrl,
       mqttTopic: mqttTopic || `zunex/stations/${stationId}`,
       mqttPort, clientId: clientId || deviceId, useTls,
       username, password,
@@ -755,6 +812,42 @@ function HardwareForm({ initial, onSaved, onClose }: HardwareFormProps) {
           </select>
         </label>
         <TextField label="Device ID" value={deviceId} onChange={(e) => setDeviceId(e.target.value)} required />
+      </div>
+
+      {/* Device type selector */}
+      <div>
+        <span className="text-xs uppercase tracking-wider text-paper-dim font-medium">Device type</span>
+        <div className="grid grid-cols-2 gap-3 mt-1.5">
+          {(["zunex_one", "zunex_plus"] as const).map((t) => {
+            const meta = deviceTypeMeta[t];
+            const selected = deviceType === t;
+            return (
+              <button
+                key={t}
+                type="button"
+                onClick={() => setDeviceType(t)}
+                className={`rounded-xl border px-3 py-2.5 text-left transition ${
+                  selected
+                    ? t === "zunex_plus"
+                      ? "border-[#a855f7]/60 bg-[#a855f7]/10 shadow-[0_0_20px_rgba(168,85,247,0.15)]"
+                      : "border-[#4a63ff]/60 bg-[#4a63ff]/10 shadow-[0_0_20px_rgba(74,99,255,0.15)]"
+                    : "border-white/10 bg-black/30 hover:border-white/25"
+                }`}
+              >
+                <div className={`text-sm font-semibold ${selected ? (t === "zunex_plus" ? "text-[#d8b4fe]" : "text-[#a9bcff]") : "text-paper"}`}>
+                  {meta.label}
+                </div>
+                <div className="text-[11px] text-paper-dim mt-0.5">{meta.hint}</div>
+              </button>
+            );
+          })}
+        </div>
+        {deviceType === "zunex_plus" && (
+          <div className="mt-2 text-[11px] text-[#d8b4fe]/80 flex items-center gap-1.5">
+            <span className="inline-block w-1 h-1 rounded-full bg-[#a855f7]" />
+            Zunex Plus plays video ads from the media server — assign playlists under Media Ads after adding.
+          </div>
+        )}
       </div>
       <div className="h-px bg-white/10" />
       <TextField label="Broker URL" value={brokerUrl} onChange={(e) => setBrokerUrl(e.target.value)} />

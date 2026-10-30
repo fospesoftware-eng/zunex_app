@@ -1,6 +1,7 @@
 import { jsonError, jsonOk } from "@/lib/server/http";
 import { requireAdmin } from "@/app/api/backend/_auth";
 import { listHardware, createHardware, checkDeviceIdUnique } from "@/lib/server/hardwareStore";
+import { logAudit } from "@/lib/server/audit";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +15,7 @@ export async function GET(req: Request) {
 interface CreateBody {
   stationId?: string;
   deviceId?: string;
+  deviceType?: "zunex_one" | "zunex_plus";
   brokerUrl?: string;
   mqttTopic?: string;
   mqttPort?: number;
@@ -39,6 +41,9 @@ export async function POST(req: Request) {
   if (!body.stationId || !body.deviceId) {
     return jsonError("invalid_request", "stationId and deviceId are required");
   }
+  if (body.deviceType && !["zunex_one", "zunex_plus"].includes(body.deviceType)) {
+    return jsonError("invalid_request", "deviceType must be zunex_one or zunex_plus");
+  }
   // Uniqueness check
   const unique = await checkDeviceIdUnique(body.deviceId);
   if (!unique) {
@@ -47,6 +52,7 @@ export async function POST(req: Request) {
   const h = await createHardware({
     stationId: body.stationId,
     deviceId: body.deviceId,
+    deviceType: body.deviceType ?? "zunex_one",
     brokerUrl: body.brokerUrl ?? "mqtt://broker.zunexglobal.com",
     mqttTopic: body.mqttTopic ?? `zunex/stations/${body.stationId}`,
     mqttPort: body.mqttPort ?? 1883,
@@ -60,5 +66,6 @@ export async function POST(req: Request) {
     telemetryEnabled: body.telemetryEnabled ?? true,
   });
   if (!h) return jsonError("db_error", "Failed to create hardware");
+  await logAudit(auth.admin.email, "hardware-added", `Added ${h.deviceType === "zunex_plus" ? "Zunex Plus" : "Zunex One"} device ${h.deviceId} on ${h.stationId}`, h.id);
   return jsonOk(h, { status: 201 });
 }

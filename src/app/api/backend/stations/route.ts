@@ -1,6 +1,7 @@
 import { computeAdminStationStatus, createAdminStation, getAllAdminStations } from "@/lib/server/adminStations";
 import { jsonError, jsonOk } from "@/lib/server/http";
 import { requireAdmin } from "@/app/api/backend/_auth";
+import { logAudit } from "@/lib/server/audit";
 
 export const dynamic = "force-dynamic";
 
@@ -52,5 +53,6 @@ export async function POST(req: Request) {
     lng: body.lng ?? 0,
   });
   if (!station) return jsonError("db_error", "Failed to create station");
+  await logAudit(auth.admin.email, "station-created", `Created station ${station.name} (${station.id})`, station.id);
   return jsonOk({ ...station, liveStatus: computeAdminStationStatus(station) }, { status: 201 });
 }

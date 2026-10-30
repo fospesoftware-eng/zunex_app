@@ -6,6 +6,7 @@ import {
 } from "@/lib/server/adminStations";
 import { jsonError, jsonOk } from "@/lib/server/http";
 import { requireAdmin } from "@/app/api/backend/_auth";
+import { logAudit } from "@/lib/server/audit";
 
 export const dynamic = "force-dynamic";
 
@@ -48,6 +49,7 @@ export async function PATCH(
   const { id } = await params;
   const updated = await updateAdminStation(id, patch);
   if (!updated) return jsonError("station_not_found", undefined, 404);
+  await logAudit(auth.admin.email, "station-updated", `Updated station ${updated.name} (${id})`, id);
   return jsonOk({ ...updated, liveStatus: computeAdminStationStatus(updated) });
 }
 
@@ -60,5 +62,6 @@ export async function DELETE(
   const { id } = await params;
   const ok = await deleteAdminStation(id);
   if (!ok) return jsonError("station_not_found", undefined, 404);
+  await logAudit(auth.admin.email, "station-updated", `Deleted station ${id}`, id);
   return jsonOk({ deleted: true });
 }

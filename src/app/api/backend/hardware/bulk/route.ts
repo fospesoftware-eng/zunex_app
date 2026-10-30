@@ -6,6 +6,7 @@ import {
   getExistingStationIds,
   type BulkHardwareInput,
 } from "@/lib/server/hardwareStore";
+import { logAudit } from "@/lib/server/audit";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +15,7 @@ const MAX_ROWS = 200;
 interface BulkRowBody {
   deviceId?: string;
   stationId?: string;
+  deviceType?: string;
   brokerUrl?: string;
   mqttPort?: number | string;
   mqttTopic?: string;
@@ -89,9 +91,14 @@ export async function POST(req: Request) {
       return void results.push({ row: rowNum, deviceId, ok: false, error: "duplicate device_id in this file" });
     seenInBatch.add(deviceId);
 
+    const rawType = String(r.deviceType ?? "").trim().toLowerCase();
+    if (rawType && !["zunex_one", "zunex_plus"].includes(rawType))
+      return void results.push({ row: rowNum, deviceId, ok: false, error: "device_type must be zunex_one or zunex_plus" });
+
     valid.push({
       deviceId,
       stationId,
+      deviceType: rawType === "zunex_plus" ? "zunex_plus" : "zunex_one",
       brokerUrl: String(r.brokerUrl ?? "").trim() || "mqtt://broker.zunexglobal.com",
       mqttTopic: String(r.mqttTopic ?? "").trim() || `zunex/stations/${stationId}`,
       mqttPort: toNum(r.mqttPort, 1883),
@@ -121,6 +128,9 @@ export async function POST(req: Request) {
   }
 
   const okCount = results.filter((r) => r.ok).length;
+  if (okCount > 0) {
+    await logAudit(auth.admin.email, "hardware-imported", `Bulk imported ${okCount} hardware device${okCount !== 1 ? "s" : ""} (${rows.length - okCount} failed)`);
+  }
   return jsonOk({
     total: rows.length,
     created: okCount,

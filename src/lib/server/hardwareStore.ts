@@ -4,11 +4,13 @@
 import { getAdminSupabase } from "@/lib/server/supabase";
 
 export type ConnectionStatus = "online" | "offline" | "connecting" | "unknown";
+export type DeviceType = "zunex_one" | "zunex_plus";
 
 export interface HardwareConfig {
   id: string;
   stationId: string;
   deviceId: string;
+  deviceType: DeviceType;
   brokerUrl: string;
   mqttTopic: string;
   mqttPort: number;
@@ -30,6 +32,7 @@ function rowToHardware(row: Record<string, unknown>): HardwareConfig {
     id: String(row.id),
     stationId: String(row.station_id),
     deviceId: String(row.device_id ?? ""),
+    deviceType: row.device_type === "zunex_plus" ? "zunex_plus" : "zunex_one",
     brokerUrl: String(row.broker_url ?? ""),
     mqttTopic: String(row.mqtt_topic ?? ""),
     mqttPort: Number(row.mqtt_port ?? 1883),
@@ -50,6 +53,7 @@ function hardwareToRow(h: Omit<HardwareConfig, "id" | "updatedAt" | "lastSeenAt"
   return {
     station_id: h.stationId,
     device_id: h.deviceId,
+    device_type: h.deviceType,
     broker_url: h.brokerUrl,
     mqtt_topic: h.mqttTopic,
     mqtt_port: h.mqttPort,
@@ -142,6 +146,7 @@ export async function createHardware(
 export interface BulkHardwareInput {
   stationId: string;
   deviceId: string;
+  deviceType: DeviceType;
   brokerUrl: string;
   mqttTopic: string;
   mqttPort: number;
@@ -201,6 +206,7 @@ export async function updateHardware(
   const update: Record<string, unknown> = {};
   if (patch.stationId !== undefined) update.station_id = patch.stationId;
   if (patch.deviceId !== undefined) update.device_id = patch.deviceId;
+  if (patch.deviceType !== undefined) update.device_type = patch.deviceType;
   if (patch.brokerUrl !== undefined) update.broker_url = patch.brokerUrl;
   if (patch.mqttTopic !== undefined) update.mqtt_topic = patch.mqttTopic;
   if (patch.mqttPort !== undefined) update.mqtt_port = patch.mqttPort;

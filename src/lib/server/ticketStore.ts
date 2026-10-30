@@ -1,10 +1,10 @@
 // ---------------------------------------------------------------------------
-// Support ticket store — JSON file-backed with graceful in-memory fallback.
-// File lives at ./data/tickets.json relative to CWD.
+// Support ticket store — backed by Supabase (public.tickets).
+// If Supabase is not configured, functions degrade gracefully
+// (empty lists / null / false).
 // ---------------------------------------------------------------------------
 
-import { writeFileSync, readFileSync, existsSync, mkdirSync } from "node:fs";
-import { join } from "node:path";
+import { getAdminSupabase } from "@/lib/server/supabase";
 
 export type TicketStatus = "open" | "in_progress" | "resolved" | "closed";
 export type TicketPriority = "low" | "medium" | "high" | "critical";
@@ -24,20 +24,11 @@ export interface Ticket {
   closedAt: number | null;
 }
 
-const DATA_DIR = join(process.cwd(), "data");
-const FILE = join(DATA_DIR, "tickets.json");
-
-let memoryOnlyFallback = false;
-
-function ensureDataDir(): void {
-  try {
-    if (!existsSync(DATA_DIR)) {
-      mkdirSync(DATA_DIR, { recursive: true });
-    }
-    writeFileSync(join(DATA_DIR, ".write_test"), "ok");
-  } catch {
-    memoryOnlyFallback = true;
-  }
+export interface TicketFilter {
+  status?: TicketStatus;
+  priority?: TicketPriority;
+  stationId?: string;
+  search?: string;
 }
 
 function now(): number {
@@ -48,179 +39,127 @@ function newId(): string {
   return `tk_${now().toString(36)}${Math.floor(Math.random() * 1000)}`;
 }
 
-function seed(): Ticket[] {
-  const t = now();
-  return [
-    {
-      id: "tk_seed_a",
-      subject: "ZNX-A1 charging port not detecting device",
-      description: "Station at Prestige Tech Park Level 2 stopped accepting devices after the overnight firmware push.",
-      priority: "critical",
-      status: "open",
-      requesterName: "Priya Menon",
-      requesterEmail: "priya@prestigetp.example",
-      stationId: "ZNX-A1",
-      assignee: null,
-      createdAt: t - 2 * 3600_000,
-      updatedAt: t - 2 * 3600_000,
-      closedAt: null,
-    },
-    {
-      id: "tk_seed_b",
-      subject: "Billing discrepancy — double charged",
-      description: "Customer was billed twice for the same 25-minute session on ZNX-B2.",
-      priority: "high",
-      status: "open",
-      requesterName: "Karthik Iyer",
-      requesterEmail: "karthik.iyer@example.com",
-      stationId: "ZNX-B2",
-      assignee: null,
-      createdAt: t - 5 * 3600_000,
-      updatedAt: t - 4 * 3600_000,
-      closedAt: null,
-    },
-    {
-      id: "tk_seed_c",
-      subject: "MQTT broker flapping — ZNX-L1 offline intermittently",
-      description: "Telemetry shows L1 going offline every ~30 minutes for the past hour. Broker logs suggest a keepalive race.",
-      priority: "medium",
-      status: "in_progress",
-      requesterName: "Ops Team",
-      requesterEmail: "ops@zunexglobal.com",
-      stationId: "ZNX-L1",
-      assignee: "admin@zunexglobal.com",
-      createdAt: t - 9 * 3600_000,
-      updatedAt: t - 1 * 3600_000,
-      closedAt: null,
-    },
-    {
-      id: "tk_seed_d",
-      subject: "Welcome screen typo on Chinese locale",
-      description: "Minor text fix — already merged, waiting release.",
-      priority: "low",
-      status: "resolved",
-      requesterName: "Lin Wei",
-      requesterEmail: "lin.wei@example.com",
-      stationId: null,
-      assignee: "admin@zunexglobal.com",
-      createdAt: t - 48 * 3600_000,
-      updatedAt: t - 24 * 3600_000,
-      closedAt: null,
-    },
-  ];
-}
-
-let cached: Ticket[] | null = null;
-
-function load(): Ticket[] {
-  ensureDataDir();
-  if (memoryOnlyFallback) return seed();
-  try {
-    if (existsSync(FILE)) {
-      const raw = readFileSync(FILE, "utf-8");
-      return JSON.parse(raw) as Ticket[];
-    }
-  } catch {
-    // fall through
-  }
-  const fresh = seed();
-  write(fresh);
-  return fresh;
-}
-
-function write(items: Ticket[]): void {
-  if (memoryOnlyFallback) return;
-  try {
-    ensureDataDir();
-    writeFileSync(FILE, JSON.stringify(items, null, 2), "utf-8");
-  } catch {
-    memoryOnlyFallback = true;
-  }
-}
-
-function all(): Ticket[] {
-  if (!cached) cached = load();
-  return cached;
-}
-
-function persist(): void {
-  write(all());
-}
-
-export interface TicketFilter {
-  status?: TicketStatus;
-  priority?: TicketPriority;
-  stationId?: string;
-  search?: string;
-}
-
-export function listTickets(filter?: TicketFilter): Ticket[] {
-  const items = all();
-  if (!filter) return items.map((t) => ({ ...t }));
-  return items
-    .filter((t) => {
-      if (filter.status && t.status !== filter.status) return false;
-      if (filter.priority && t.priority !== filter.priority) return false;
-      if (filter.stationId && t.stationId !== filter.stationId) return false;
-      if (filter.search) {
-        const q = filter.search.toLowerCase();
-        const haystack =
-          `${t.subject} ${t.description} ${t.requesterName} ${t.requesterEmail} ${t.id}`.toLowerCase();
-        if (!haystack.includes(q)) return false;
-      }
-      return true;
-    })
-    .map((t) => ({ ...t }))
-    .sort((a, b) => b.createdAt - a.createdAt);
-}
-
-export function getTicket(id: string): Ticket | null {
-  const t = all().find((x) => x.id === id);
-  return t ? { ...t } : null;
-}
-
-export function createTicket(
-  data: Omit<Ticket, "id" | "createdAt" | "updatedAt" | "closedAt" | "status"> & { status?: TicketStatus },
-): Ticket {
-  const t = now();
-  const ticket: Ticket = {
-    ...data,
-    id: newId(),
-    status: data.status ?? "open",
-    createdAt: t,
-    updatedAt: t,
-    closedAt: data.status === "closed" ? t : null,
+// ── Supabase row → Ticket ────────────────────────────────────────────────
+function rowToTicket(row: Record<string, unknown>): Ticket {
+  return {
+    id: String(row.id),
+    subject: String(row.subject ?? ""),
+    description: String(row.description ?? ""),
+    priority: (row.priority as TicketPriority) ?? "medium",
+    status: (row.status as TicketStatus) ?? "open",
+    requesterName: String(row.requester_name ?? ""),
+    requesterEmail: String(row.requester_email ?? ""),
+    stationId: row.station_id ? String(row.station_id) : null,
+    assignee: row.assignee ? String(row.assignee) : null,
+    createdAt: row.created_at ? Number(row.created_at) : 0,
+    updatedAt: row.updated_at ? Number(row.updated_at) : 0,
+    closedAt: row.closed_at ? Number(row.closed_at) : null,
   };
-  all().push(ticket);
-  persist();
-  return { ...ticket };
 }
 
-export function updateTicket(
+export async function listTickets(filter?: TicketFilter): Promise<Ticket[]> {
+  const sb = getAdminSupabase();
+  if (!sb) return [];
+  let query = sb.from("tickets").select("*");
+  if (filter?.status) query = query.eq("status", filter.status);
+  if (filter?.priority) query = query.eq("priority", filter.priority);
+  if (filter?.stationId) query = query.eq("station_id", filter.stationId);
+  if (filter?.search) {
+    // Strip characters that would break the PostgREST .or() filter syntax.
+    const q = filter.search.replace(/[%,()]/g, " ").trim();
+    if (q) {
+      query = query.or(`subject.ilike.%${q}%,description.ilike.%${q}%`);
+    }
+  }
+  const { data, error } = await query.order("created_at", { ascending: false });
+  if (error) {
+    console.error("[ticketStore] list error:", error);
+    return [];
+  }
+  return (data ?? []).map(rowToTicket);
+}
+
+export async function getTicket(id: string): Promise<Ticket | null> {
+  const sb = getAdminSupabase();
+  if (!sb) return null;
+  const { data, error } = await sb.from("tickets").select("*").eq("id", id).single();
+  if (error || !data) return null;
+  return rowToTicket(data);
+}
+
+export async function createTicket(
+  data: Omit<Ticket, "id" | "createdAt" | "updatedAt" | "closedAt" | "status"> & { status?: TicketStatus },
+): Promise<Ticket | null> {
+  const sb = getAdminSupabase();
+  if (!sb) return null;
+  const t = now();
+  const row = {
+    id: newId(),
+    subject: data.subject,
+    description: data.description,
+    priority: data.priority,
+    status: data.status ?? "open",
+    requester_name: data.requesterName,
+    requester_email: data.requesterEmail,
+    station_id: data.stationId,
+    assignee: data.assignee,
+    created_at: t,
+    updated_at: t,
+    closed_at: data.status === "closed" ? t : null,
+  };
+  const { data: result, error } = await sb.from("tickets").insert(row).select().single();
+  if (error) {
+    console.error("[ticketStore] insert error:", error);
+    return null;
+  }
+  return rowToTicket(result);
+}
+
+export async function updateTicket(
   id: string,
   patch: Partial<Omit<Ticket, "id" | "createdAt">>,
-): Ticket | null {
-  const list = all();
-  const idx = list.findIndex((x) => x.id === id);
-  if (idx === -1) return null;
-  const existing = list[idx];
-  const updated: Ticket = { ...existing, ...patch, updatedAt: now() };
+): Promise<Ticket | null> {
+  const sb = getAdminSupabase();
+  if (!sb) return null;
+  const existing = await getTicket(id);
+  if (!existing) return null;
+  const t = now();
+  const update: Record<string, unknown> = { updated_at: t };
+  if (patch.subject !== undefined) update.subject = patch.subject;
+  if (patch.description !== undefined) update.description = patch.description;
+  if (patch.priority !== undefined) update.priority = patch.priority;
+  if (patch.status !== undefined) update.status = patch.status;
+  if (patch.requesterName !== undefined) update.requester_name = patch.requesterName;
+  if (patch.requesterEmail !== undefined) update.requester_email = patch.requesterEmail;
+  if (patch.stationId !== undefined) update.station_id = patch.stationId;
+  if (patch.assignee !== undefined) update.assignee = patch.assignee;
+  if (patch.closedAt !== undefined) update.closed_at = patch.closedAt;
   // closedAt management
   if (patch.status === "closed" && existing.status !== "closed" && !existing.closedAt) {
-    updated.closedAt = now();
+    update.closed_at = t;
   } else if (patch.status && patch.status !== "closed" && existing.status === "closed") {
-    updated.closedAt = null;
+    update.closed_at = null;
   }
-  list[idx] = updated;
-  persist();
-  return { ...updated };
+  const { data, error } = await sb
+    .from("tickets")
+    .update(update)
+    .eq("id", id)
+    .select()
+    .single();
+  if (error) {
+    console.error("[ticketStore] update error:", error);
+    return null;
+  }
+  return rowToTicket(data);
 }
 
-export function deleteTicket(id: string): boolean {
-  const list = all();
-  const idx = list.findIndex((x) => x.id === id);
-  if (idx === -1) return false;
-  list.splice(idx, 1);
-  persist();
-  return true;
+export async function deleteTicket(id: string): Promise<boolean> {
+  const sb = getAdminSupabase();
+  if (!sb) return false;
+  const { data, error } = await sb.from("tickets").delete().eq("id", id).select("id");
+  if (error) {
+    console.error("[ticketStore] delete error:", error);
+    return false;
+  }
+  return (data?.length ?? 0) > 0;
 }

@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { KeyRound, Plus, Eye, Copy, Trash2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { KeyRound, Plus, Copy, Trash2, TriangleAlert } from "lucide-react";
 import { GlassCard } from "@/components/backend/GlassCard";
 import { PageHeader } from "@/components/backend/PageHeader";
 import { Button } from "@/components/backend/Button";
@@ -9,46 +9,16 @@ import { Modal } from "@/components/backend/Modal";
 import { TextField } from "@/components/backend/TextField";
 import { Pill } from "@/components/backend/Pill";
 import { useToast } from "@/components/backend/Toast";
+import { getAccessToken } from "@/lib/client/backendAuth";
 
 interface ApiKey {
   id: string;
   name: string;
-  key: string;
+  key_prefix: string;
   permissions: string[];
-  lastUsed: string;
-  createdAt: string;
-}
-
-const initialKeys: ApiKey[] = [
-  {
-    id: "k1",
-    name: "Partner Dashboard",
-    key: "znx_live_a8f3k2p9v1r4s6t0m5n7",
-    permissions: ["read", "write"],
-    lastUsed: "2 min ago",
-    createdAt: "Sep 10, 2026",
-  },
-  {
-    id: "k2",
-    name: "Monitoring Bot",
-    key: "znx_live_x7y2z9b5c3d1e8f6a0g4",
-    permissions: ["read"],
-    lastUsed: "15 min ago",
-    createdAt: "Aug 28, 2026",
-  },
-  {
-    id: "k3",
-    name: "Internal CLI",
-    key: "znx_live_q1w4e7r0t3y6u9i2o5p8",
-    permissions: ["read", "write", "admin"],
-    lastUsed: "3 days ago",
-    createdAt: "Jul 14, 2026",
-  },
-];
-
-function maskKey(key: string): string {
-  if (key.length <= 12) return key;
-  return key.slice(0, 8) + "••••" + key.slice(-4);
+  last_used_at: number | null;
+  revoked: boolean;
+  created_at: number;
 }
 
 const permLabels: Record<string, { label: string; variant: "success" | "warn" | "error" | "info" | "default" }> = {
@@ -57,21 +27,68 @@ const permLabels: Record<string, { label: string; variant: "success" | "warn" | 
   admin: { label: "Admin", variant: "error" },
 };
 
+function relTime(ts: number): string {
+  const diff = Date.now() - ts;
+  const min = Math.floor(diff / 60000);
+  if (min < 1) return "just now";
+  if (min < 60) return `${min} min ago`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr} hr ago`;
+  const d = Math.floor(hr / 24);
+  if (d < 30) return `${d} day${d === 1 ? "" : "s"} ago`;
+  return new Date(ts).toLocaleDateString();
+}
+
+function fmtDate(ts: number): string {
+  return new Date(ts).toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+async function authHeaders(json = false): Promise<Record<string, string>> {
+  const headers: Record<string, string> = {};
+  if (json) headers["content-type"] = "application/json";
+  const token = await getAccessToken();
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  return headers;
+}
+
 export default function ApiKeysPage() {
-  const [keys, setKeys] = useState<ApiKey[]>(initialKeys);
-  const [showValues, setShowValues] = useState<Record<string, boolean>>({});
+  const [keys, setKeys] = useState<ApiKey[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [newName, setNewName] = useState("");
   const [newPerms, setNewPerms] = useState<string[]>(["read"]);
+  const [creating, setCreating] = useState(false);
+  const [createdKey, setCreatedKey] = useState<{ name: string; fullKey: string } | null>(null);
   const toast = useToast();
 
-  const toggleVisibility = (id: string) => {
-    setShowValues((prev) => ({ ...prev, [id]: !prev[id] }));
+  const load = async () => {
+    const res = await fetch("/api/backend/api-keys", { headers: await authHeaders() });
+    const j = await res.json();
+    if (j.ok) setKeys(j.data as ApiKey[]);
+    else toast.show("error", j.message ?? "Failed to load API keys");
   };
 
-  const revokeKey = (id: string) => {
-    const k = keys.find((x) => x.id === id);
-    toast.show("error", `Revoke endpoint not wired — would revoke "${k?.name}"`);
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const revokeKey = async (k: ApiKey) => {
+    if (!confirm(`Revoke key "${k.name}"? Clients using it will lose access immediately.`)) return;
+    const res = await fetch(`/api/backend/api-keys/${k.id}`, {
+      method: "DELETE",
+      headers: await authHeaders(),
+    });
+    const j = await res.json();
+    if (j.ok) {
+      toast.show("success", `Key "${k.name}" revoked`);
+      load();
+    } else {
+      toast.show("error", j.message ?? "Failed to revoke key");
+    }
   };
 
   const copyKey = (key: string) => {
@@ -87,16 +104,31 @@ export default function ApiKeysPage() {
     );
   };
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     if (!newName.trim()) {
       toast.show("error", "Please enter a key name");
       return;
     }
-    // Toast simulating generation — no real API yet
-    toast.show("success", `API key "${newName}" created · copied to clipboard`);
-    setModalOpen(false);
-    setNewName("");
-    setNewPerms(["read"]);
+    setCreating(true);
+    try {
+      const res = await fetch("/api/backend/api-keys", {
+        method: "POST",
+        headers: await authHeaders(true),
+        body: JSON.stringify({ name: newName.trim(), permissions: newPerms }),
+      });
+      const j = await res.json();
+      if (!j.ok) {
+        toast.show("error", j.message ?? "Failed to create key");
+        return;
+      }
+      setModalOpen(false);
+      setCreatedKey({ name: j.data.name, fullKey: j.data.fullKey });
+      setNewName("");
+      setNewPerms(["read"]);
+      load();
+    } finally {
+      setCreating(false);
+    }
   };
 
   return (
@@ -112,69 +144,68 @@ export default function ApiKeysPage() {
       />
 
       <div className="space-y-4">
-        {keys.map((k) => {
-          const visible = showValues[k.id];
-          return (
-            <GlassCard key={k.id}>
-              <div className="flex flex-wrap items-start gap-4">
-                {/* Icon */}
-                <div className="shrink-0 w-11 h-11 rounded-xl bg-gradient-to-br from-[#4a63ff]/25 to-[#2447ff]/5 border border-white/10 flex items-center justify-center">
-                  <KeyRound size={18} className="text-[#a9bcff]" />
+        {keys.map((k) => (
+          <GlassCard key={k.id} className={k.revoked ? "opacity-60" : ""}>
+            <div className="flex flex-wrap items-start gap-4">
+              {/* Icon */}
+              <div className="shrink-0 w-11 h-11 rounded-xl bg-gradient-to-br from-[#4a63ff]/25 to-[#2447ff]/5 border border-white/10 flex items-center justify-center">
+                <KeyRound size={18} className="text-[#a9bcff]" />
+              </div>
+
+              <div className="flex-1 min-w-0">
+                <div className="flex flex-wrap items-center gap-2 mb-2">
+                  <h3 className="text-sm font-semibold text-paper">{k.name}</h3>
+                  {k.permissions.map((p) => {
+                    const cfg = permLabels[p] ?? { label: p, variant: "default" as const };
+                    return (
+                      <Pill key={p} variant={cfg.variant}>
+                        {cfg.label}
+                      </Pill>
+                    );
+                  })}
+                  {k.revoked && <Pill variant="error">Revoked</Pill>}
                 </div>
 
-                <div className="flex-1 min-w-0">
-                  <div className="flex flex-wrap items-center gap-2 mb-2">
-                    <h3 className="text-sm font-semibold text-paper">{k.name}</h3>
-                    {k.permissions.map((p) => {
-                      const cfg = permLabels[p];
-                      return (
-                        <Pill key={p} variant={cfg.variant}>
-                          {cfg.label}
-                        </Pill>
-                      );
-                    })}
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <code className="text-sm font-mono text-paper-dim bg-black/30 border border-white/10 rounded-lg px-3 py-1.5">
-                      {visible ? k.key : maskKey(k.key)}
-                    </code>
-                    <button
-                      onClick={() => toggleVisibility(k.id)}
-                      className="p-1.5 rounded-lg text-paper-dim hover:text-paper hover:bg-white/5 transition"
-                      aria-label={visible ? "Hide" : "Show"}
-                    >
-                      <Eye size={14} />
-                    </button>
-                    <button
-                      onClick={() => copyKey(k.key)}
-                      className="p-1.5 rounded-lg text-paper-dim hover:text-paper hover:bg-white/5 transition"
-                      aria-label="Copy"
-                    >
-                      <Copy size={14} />
-                    </button>
-                  </div>
-
-                  <div className="flex items-center gap-3 mt-2 text-[11px] text-paper-dim">
-                    <span>Last used: <span className="text-paper-dim">{k.lastUsed}</span></span>
-                    <span>·</span>
-                    <span>Created: {k.createdAt}</span>
-                  </div>
+                <div className="flex items-center gap-2">
+                  <code className="text-sm font-mono text-paper-dim bg-black/30 border border-white/10 rounded-lg px-3 py-1.5">
+                    {k.key_prefix}••••
+                  </code>
                 </div>
 
+                <div className="flex items-center gap-3 mt-2 text-[11px] text-paper-dim">
+                  <span>
+                    Last used:{" "}
+                    <span className="text-paper-dim">
+                      {k.last_used_at ? relTime(k.last_used_at) : "Never"}
+                    </span>
+                  </span>
+                  <span>·</span>
+                  <span>Created: {fmtDate(k.created_at)}</span>
+                </div>
+              </div>
+
+              {!k.revoked && (
                 <div className="shrink-0">
                   <Button
                     variant="danger"
                     size="sm"
-                    onClick={() => revokeKey(k.id)}
+                    onClick={() => revokeKey(k)}
                   >
                     <Trash2 size={14} /> Revoke
                   </Button>
                 </div>
-              </div>
-            </GlassCard>
-          );
-        })}
+              )}
+            </div>
+          </GlassCard>
+        ))}
+
+        {keys.length === 0 && (
+          <GlassCard>
+            <div className="py-8 text-center text-sm text-paper-dim">
+              No API keys yet — generate one to get started.
+            </div>
+          </GlassCard>
+        )}
       </div>
 
       {/* Create Modal */}
@@ -220,9 +251,43 @@ export default function ApiKeysPage() {
 
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="ghost" onClick={() => setModalOpen(false)}>Cancel</Button>
-            <Button onClick={handleCreate}>Generate key</Button>
+            <Button onClick={handleCreate} disabled={creating}>
+              {creating ? "Generating…" : "Generate key"}
+            </Button>
           </div>
         </div>
+      </Modal>
+
+      {/* One-time full key reveal */}
+      <Modal
+        open={createdKey !== null}
+        onClose={() => setCreatedKey(null)}
+        title="API key created"
+      >
+        {createdKey && (
+          <div className="space-y-4">
+            <p className="text-sm text-paper-dim">
+              <span className="text-paper font-medium">{createdKey.name}</span> is ready.
+            </p>
+            <div className="flex items-center gap-2">
+              <code className="flex-1 text-sm font-mono text-mint-400 bg-black/30 border border-mint-400/20 rounded-lg px-3 py-2.5 break-all">
+                {createdKey.fullKey}
+              </code>
+              <Button size="sm" variant="ghost" onClick={() => copyKey(createdKey.fullKey)}>
+                <Copy size={14} /> Copy
+              </Button>
+            </div>
+            <div className="flex items-start gap-2 rounded-xl border border-ember-500/30 bg-ember-500/10 px-3 py-2.5">
+              <TriangleAlert size={15} className="text-ember-400 shrink-0 mt-0.5" />
+              <p className="text-xs text-ember-400">
+                Store it now — it won't be shown again. Only the hash is kept on our servers.
+              </p>
+            </div>
+            <div className="flex justify-end pt-2">
+              <Button onClick={() => setCreatedKey(null)}>Done</Button>
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   );

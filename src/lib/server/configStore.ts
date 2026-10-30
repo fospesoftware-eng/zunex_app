@@ -1,13 +1,11 @@
 // ---------------------------------------------------------------------------
-// Admin config store — JSON file-backed with graceful in-memory fallback.
-// File lives at ./data/admin-config.json relative to CWD. On import it loads
-// from disk if present; otherwise seeds sensible defaults. Every mutation
-// writes synchronously. If the filesystem is read-only (e.g. Replit preview)
-// we silently fall back to in-memory only.
+// Admin config store — backed by Supabase table public.admin_config.
+// Single row key='admin_config' whose jsonb value holds the AdminConfig
+// shape (settings, strategies, partners, seedOverride). Admin users are
+// managed separately via Supabase Auth + public.admins.
 // ---------------------------------------------------------------------------
 
-import { writeFileSync, readFileSync, mkdirSync, existsSync } from "node:fs";
-import { join } from "node:path";
+import { getAdminSupabase } from "@/lib/server/supabase";
 // Ensure the simulated heartbeat scheduler is alive whenever any server
 // module imports configStore. Guarded against HMR duplicates inside the file.
 import "./heartbeat";
@@ -57,41 +55,14 @@ export interface Partner {
   joinedAt: number;
 }
 
-export interface AdminUser {
-  id: string;
-  name: string;
-  email: string;
-  role: "super_admin" | "admin" | "viewer";
-  active: boolean;
-  lastLoginAt: number | null;
-}
-
 export interface AdminConfig {
   settings: AdminSettings;
   strategies: OrderStrategy[];
   partners: Partner[];
-  admins: AdminUser[];
   seedOverride: Record<string, unknown>;
 }
 
-const DATA_DIR = join(process.cwd(), "data");
-const CONFIG_FILE = join(DATA_DIR, "admin-config.json");
-
-let memoryOnlyFallback = false;
-
-/** Create ./data/ on disk if missing. Silently sets fallback if read-only. */
-export function ensureDataDir(): void {
-  try {
-    if (!existsSync(DATA_DIR)) {
-      mkdirSync(DATA_DIR, { recursive: true });
-    }
-    // Test writability.
-    const testFile = join(DATA_DIR, ".write_test");
-    writeFileSync(testFile, "ok");
-  } catch {
-    memoryOnlyFallback = true;
-  }
-}
+const CONFIG_KEY = "admin_config";
 
 function defaults(): AdminConfig {
   const now = Date.now();
@@ -143,65 +114,51 @@ function defaults(): AdminConfig {
         joinedAt: now,
       },
     ],
-    admins: [
-      {
-        id: "adm_super",
-        name: "ZUNEX Super Admin",
-        email: "admin@zunexglobal.com",
-        role: "super_admin",
-        active: true,
-        lastLoginAt: null,
-      },
-    ],
     seedOverride: {},
   };
 }
 
-let cached: AdminConfig | null = null;
+/**
+ * Read the admin config row. If missing, insert defaults and return them.
+ * If Supabase is not configured, return in-memory defaults without crashing.
+ */
+export async function getAdminConfig(): Promise<AdminConfig> {
+  const sb = getAdminSupabase();
+  if (!sb) return defaults();
 
-function load(): AdminConfig {
-  ensureDataDir();
-  if (memoryOnlyFallback) return defaults();
-  try {
-    if (existsSync(CONFIG_FILE)) {
-      const raw = readFileSync(CONFIG_FILE, "utf-8");
-      return JSON.parse(raw) as AdminConfig;
-    }
-  } catch {
-    // Fall through to defaults.
+  const { data, error } = await sb
+    .from("admin_config")
+    .select("value")
+    .eq("key", CONFIG_KEY)
+    .maybeSingle();
+
+  if (error) {
+    console.error("[configStore] read failed:", error.message);
+    return defaults();
   }
+
+  if (data?.value) return data.value as AdminConfig;
+
   const fresh = defaults();
-  write(fresh);
+  const { error: insertErr } = await sb
+    .from("admin_config")
+    .insert({ key: CONFIG_KEY, value: fresh });
+  if (insertErr) {
+    console.error("[configStore] seed insert failed:", insertErr.message);
+  }
   return fresh;
 }
 
-function write(cfg: AdminConfig): void {
-  if (memoryOnlyFallback) return;
-  try {
-    ensureDataDir();
-    writeFileSync(CONFIG_FILE, JSON.stringify(cfg, null, 2), "utf-8");
-  } catch {
-    memoryOnlyFallback = true;
+/** Upsert the admin config row. No-op when Supabase is not configured. */
+export async function saveAdminConfig(cfg: AdminConfig): Promise<void> {
+  const sb = getAdminSupabase();
+  if (!sb) return;
+  const { error } = await sb
+    .from("admin_config")
+    .upsert({ key: CONFIG_KEY, value: cfg });
+  if (error) {
+    console.error("[configStore] write failed:", error.message);
   }
-}
-
-/** Getter — returns a deep copy so callers can't mutate the store directly. */
-export function adminConfig(): AdminConfig {
-  if (!cached) cached = load();
-  return JSON.parse(JSON.stringify(cached)) as AdminConfig;
-}
-
-/** Replace the entire config on disk and in memory. */
-export function saveAdminConfig(cfg: AdminConfig): void {
-  cached = JSON.parse(JSON.stringify(cfg)) as AdminConfig;
-  write(cached);
-}
-
-/** Reset to seeded defaults. */
-export function resetAdminConfig(): AdminConfig {
-  const d = defaults();
-  saveAdminConfig(d);
-  return adminConfig();
 }
 
 /** Convenience id generator, scoped to this module. */

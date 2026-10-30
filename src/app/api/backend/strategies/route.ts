@@ -1,13 +1,15 @@
-import { adminConfig, newId, saveAdminConfig } from "@/lib/server/configStore";
+import { getAdminConfig, newId, saveAdminConfig } from "@/lib/server/configStore";
 import { jsonError, jsonOk } from "@/lib/server/http";
 import { requireAdmin } from "@/app/api/backend/_auth";
+import { logAudit } from "@/lib/server/audit";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
   const auth = await requireAdmin(req);
   if (!auth.ok) return auth.response;
-  return jsonOk(adminConfig().strategies);
+  const cfg = await getAdminConfig();
+  return jsonOk(cfg.strategies);
 }
 
 interface CreateStrategy {
@@ -26,7 +28,7 @@ export async function POST(req: Request) {
   }
   if (!body.timeSlot || typeof body.deviceRatioPct !== "number")
     return jsonError("invalid_request", "timeSlot and deviceRatioPct are required");
-  const cfg = adminConfig();
+  const cfg = await getAdminConfig();
   const strat = {
     id: newId("strat"),
     timeSlot: body.timeSlot,
@@ -35,6 +37,7 @@ export async function POST(req: Request) {
     createdAt: Date.now(),
   };
   cfg.strategies.push(strat);
-  saveAdminConfig(cfg);
+  await saveAdminConfig(cfg);
+  await logAudit(auth.admin.email, "strategy-created", `Created strategy ${strat.timeSlot} (${strat.deviceRatioPct}%)`, strat.id);
   return jsonOk(strat, { status: 201 });
 }

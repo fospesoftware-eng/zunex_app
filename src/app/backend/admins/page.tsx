@@ -15,11 +15,31 @@ import { Plus } from "lucide-react";
 
 interface AdminRow {
   id: string;
-  name: string;
   email: string;
+  name: string | null;
   role: string;
   active: boolean;
-  lastLoginAt: number | null;
+  last_login: string | null;
+  created_at: string;
+}
+
+const ROLE_OPTIONS = [
+  { value: "super_admin", label: "Super admin" },
+  { value: "admin", label: "Admin" },
+  { value: "operator", label: "Operator" },
+  { value: "support", label: "Support" },
+];
+
+function relativeTime(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "Just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days}d ago`;
+  return new Date(iso).toLocaleDateString();
 }
 
 export default function AdminsPage() {
@@ -47,7 +67,7 @@ export default function AdminsPage() {
     const token = await getAccessToken();
     const headers: Record<string, string> = { "content-type": "application/json" };
     if (token) headers["Authorization"] = `Bearer ${token}`;
-    fetch(`/api/admin/admins/${a.id}`, {
+    fetch(`/api/backend/admins/${a.id}`, {
       method: "PATCH",
       headers,
       body: JSON.stringify({ role: newRole }),
@@ -55,15 +75,16 @@ export default function AdminsPage() {
       .then((r) => r.json())
       .then((j) => {
         if (j.ok) { toast.show("success", "Role updated"); load(); }
+        else toast.show("error", j.message);
       });
   };
 
   const handleDelete = async (a: AdminRow) => {
-    if (!confirm(`Remove admin ${a.name}?`)) return;
+    if (!confirm(`Remove admin ${a.name ?? a.email}?`)) return;
     const token = await getAccessToken();
     const headers: Record<string, string> = {};
     if (token) headers["Authorization"] = `Bearer ${token}`;
-    fetch(`/api/admin/admins/${a.id}`, { method: "DELETE", headers })
+    fetch(`/api/backend/admins/${a.id}`, { method: "DELETE", headers })
       .then((r) => r.json())
       .then((j) => {
         if (j.ok) { toast.show("success", "Admin removed"); load(); }
@@ -73,12 +94,12 @@ export default function AdminsPage() {
 
   const filtered = admins.filter(
     (a) =>
-      a.name.toLowerCase().includes(search.toLowerCase()) ||
+      (a.name ?? "").toLowerCase().includes(search.toLowerCase()) ||
       a.email.toLowerCase().includes(search.toLowerCase()),
   );
 
   const columns: ColumnDef<AdminRow>[] = [
-    { key: "name", header: "Name" },
+    { key: "name", header: "Name", render: (r) => r.name ?? "—" },
     { key: "email", header: "Email" },
     {
       key: "role",
@@ -90,9 +111,9 @@ export default function AdminsPage() {
           disabled={r.role === "super_admin"}
           className="h-8 rounded-lg bg-black/30 border border-white/10 px-2 text-xs text-paper disabled:opacity-60"
         >
-          <option value="super_admin">Super admin</option>
-          <option value="admin">Admin</option>
-          <option value="viewer">Viewer</option>
+          {ROLE_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
         </select>
       ),
     },
@@ -104,11 +125,11 @@ export default function AdminsPage() {
       ),
     },
     {
-      key: "lastLoginAt",
+      key: "last_login",
       header: "Last login",
       render: (r) =>
-        r.lastLoginAt ? (
-          <span className="text-xs text-paper-dim">{new Date(r.lastLoginAt).toLocaleString()}</span>
+        r.last_login ? (
+          <span className="text-xs text-paper-dim">{relativeTime(r.last_login)}</span>
         ) : (
           <span className="text-xs text-paper-dim/50">Never</span>
         ),
@@ -145,7 +166,8 @@ export default function AdminsPage() {
 function AdminForm({ onSaved, onClose }: { onSaved: () => void; onClose: () => void }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [role, setRole] = useState("viewer");
+  const [password, setPassword] = useState("");
+  const [role, setRole] = useState("support");
   const toast = useToast();
 
   const save = async (e: React.FormEvent) => {
@@ -156,7 +178,7 @@ function AdminForm({ onSaved, onClose }: { onSaved: () => void; onClose: () => v
     const res = await fetch("/api/backend/admins", {
       method: "POST",
       headers,
-      body: JSON.stringify({ name, email, role }),
+      body: JSON.stringify({ name, email, password, role }),
     });
     const j = await res.json();
     if (j.ok) { toast.show("success", "Admin added"); onSaved(); }
@@ -167,12 +189,13 @@ function AdminForm({ onSaved, onClose }: { onSaved: () => void; onClose: () => v
     <form onSubmit={save} className="space-y-4">
       <TextField label="Name" value={name} onChange={(e) => setName(e.target.value)} required />
       <TextField label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+      <TextField label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} />
       <label className="flex flex-col gap-1.5">
         <span className="text-xs uppercase tracking-wider text-paper-dim font-medium">Role</span>
         <select value={role} onChange={(e) => setRole(e.target.value)} className="h-10 rounded-xl bg-black/30 border border-white/10 px-3 text-sm text-paper">
-          <option value="admin">Admin</option>
-          <option value="viewer">Viewer</option>
-          <option value="super_admin">Super admin</option>
+          {ROLE_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
         </select>
       </label>
       <div className="flex justify-end gap-2 pt-2">
