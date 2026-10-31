@@ -1,6 +1,6 @@
 -- =========================================================================
 -- ZUNEX Supabase Schema — LiveDB
--- Run in Supabase SQL Editor to initialize the database.
+-- Run in Supabase SQL Editor. Fully idempotent — safe to re-run any time.
 -- =========================================================================
 
 -- -------------------------------------------------------------------------
@@ -17,7 +17,7 @@ create table if not exists public.stations (
   power_watts     integer default 45,
   connector       text default 'USB-C',
   device_model    text default 'plus',                  -- 'core' | 'plus'
-  install_type    text default 'mall',                 -- 'car'|'mall'|...
+  install_type    text default 'mall',                  -- 'car'|'mall'|...
   base_status     text default 'available',             -- 'available'|'maintenance'|'offline'
   force_status    text,                                 -- admin override
   created_at      timestamptz default now(),
@@ -51,8 +51,8 @@ create table if not exists public.hardware (
   created_at            timestamptz default now()
 );
 
--- Columns added after initial release — idempotent ALTERs must run BEFORE
--- the indexes and seed INSERT below (CREATE TABLE above is a no-op on existing DBs).
+-- Columns added after initial release — idempotent ALTERs run BEFORE
+-- indexes/seeds (CREATE TABLE is a no-op on existing DBs).
 alter table public.hardware add column if not exists device_type text not null default 'zunex_one';
 alter table public.hardware add column if not exists client_id text;
 alter table public.hardware add column if not exists use_tls boolean default false;
@@ -68,21 +68,21 @@ create index if not exists idx_hw_devtype on public.hardware(device_type);
 -- sessions — charging sessions (authoritative, not just cache)
 -- -------------------------------------------------------------------------
 create table if not exists public.sessions (
-  id              text primary key,                     -- zs_...
-  station_id      text not null references public.stations(id),
-  device_id       text,                                 -- hardware device used (hw_...)
-  plan_id         text not null,
-  amount_paise    integer,                              -- charged amount (0 for ad-sponsored)
+  id                text primary key,                   -- zs_...
+  station_id        text not null references public.stations(id),
+  device_id         text,                               -- hardware device used (hw_...)
+  plan_id           text not null,
+  amount_paise      integer,                            -- charged amount (0 = ad-sponsored)
   payment_intent_id text,                               -- PSP intent reference (pi_...)
-  started_at      timestamptz default now(),
-  ends_at         timestamptz,
-  stopped_at      timestamptz,
-  paid_at         timestamptz,
-  state           text default 'starting',              -- see SessionState union
-  power_kw        double precision,
-  delivered_kwh   double precision default 0,
-  client_did      text,
-  created_at      timestamptz default now()
+  started_at        timestamptz default now(),
+  ends_at           timestamptz,
+  stopped_at        timestamptz,
+  paid_at           timestamptz,
+  state             text default 'starting',            -- see SessionState union
+  power_kw          double precision,
+  delivered_kwh     double precision default 0,
+  client_did        text,
+  created_at        timestamptz default now()
 );
 
 -- Columns added after initial release — idempotent ALTERs for existing DBs.
@@ -93,11 +93,11 @@ alter table public.sessions add column if not exists paid_at timestamptz;
 
 create index if not exists idx_sessions_station on public.sessions(station_id);
 create index if not exists idx_sessions_device  on public.sessions(device_id);
-create index if not exists idx_sessions_state  on public.sessions(state);
-create index if not exists idx_sessions_ends   on public.sessions(ends_at);
+create index if not exists idx_sessions_state   on public.sessions(state);
+create index if not exists idx_sessions_ends    on public.sessions(ends_at);
 
 -- -------------------------------------------------------------------------
--- station_heartbeats — live telemetry (append-only, purged by date)
+-- station_heartbeats — live telemetry (append-only)
 -- -------------------------------------------------------------------------
 create table if not exists public.station_heartbeats (
   station_id      text not null references public.stations(id) on delete cascade,
@@ -112,7 +112,7 @@ create table if not exists public.station_heartbeats (
 create index if not exists idx_hb_ts on public.station_heartbeats(ts desc);
 
 -- -------------------------------------------------------------------------
--- admin_config — key-value store (replaces data/admin-config.json)
+-- admin_config — key-value store
 -- -------------------------------------------------------------------------
 create table if not exists public.admin_config (
   key   text primary key,
@@ -127,7 +127,8 @@ create table if not exists public.admins (
   id          uuid primary key references auth.users(id) on delete cascade,
   email       text not null unique,
   name        text,
-  role        text not null default 'operator' check (role in ('super_admin','admin','operator','support')),
+  role        text not null default 'operator'
+              check (role in ('super_admin','admin','operator','support')),
   avatar_url  text,
   last_login  timestamptz,
   active      boolean default true,
@@ -135,20 +136,11 @@ create table if not exists public.admins (
   updated_at  timestamptz default now()
 );
 
-create index if not exists idx_admins_role on public.admins(role);
+create index if not exists idx_admins_role   on public.admins(role);
 create index if not exists idx_admins_active on public.admins(active);
 
--- RLS: authenticated users may read ONLY their own admin row (needed for
--- client-side role check at login). Writes stay service-role only.
-alter table public.admins enable row level security;
-
-drop policy if exists "admins select own" on public.admins;
-create policy "admins select own" on public.admins
-  for select to authenticated
-  using (auth.uid() = id);
-
 -- -------------------------------------------------------------------------
--- Trigger: sync admins row on auth.users creation (optional bootstrap)
+-- Trigger: bootstrap an admins row when an auth user is created
 -- -------------------------------------------------------------------------
 create or replace function public.handle_new_admin()
 returns trigger as $$
@@ -221,10 +213,10 @@ create table if not exists public.playback_logs (
 );
 
 create index if not exists idx_playback_device on public.playback_logs(device_id, played_at desc);
-create index if not exists idx_playback_ts on public.playback_logs(played_at desc);
+create index if not exists idx_playback_ts     on public.playback_logs(played_at desc);
 
 -- -------------------------------------------------------------------------
--- tickets — support tickets (migrated from file store)
+-- tickets — support tickets
 -- -------------------------------------------------------------------------
 create table if not exists public.tickets (
   id              text primary key,                   -- tk_...
@@ -290,13 +282,24 @@ create table if not exists public.audit_log (
 create index if not exists idx_audit_ts on public.audit_log(created_at desc);
 
 -- =========================================================================
--- RLS: open for SELECT, writes blocked from publishable key
+-- ROW-LEVEL SECURITY — locked-down model
+--
+-- Server access uses the service-role key, which bypasses RLS entirely.
+-- The browser publishable key may ONLY:
+--   • read public.stations              (public station directory)
+--   • read its own row in public.admins (login role check)
+-- Every other table has RLS enabled with NO permissive policy, so anon and
+-- authenticated clients get zero access. This section drops the permissive
+-- policies shipped by earlier schema versions before re-applying the locks.
 -- =========================================================================
+
+-- Enable RLS everywhere (idempotent)
 alter table public.stations           enable row level security;
 alter table public.hardware           enable row level security;
 alter table public.sessions           enable row level security;
 alter table public.station_heartbeats enable row level security;
 alter table public.admin_config       enable row level security;
+alter table public.admins             enable row level security;
 alter table public.media_assets       enable row level security;
 alter table public.playlists          enable row level security;
 alter table public.playlist_items     enable row level security;
@@ -307,98 +310,47 @@ alter table public.api_keys           enable row level security;
 alter table public.notifications      enable row level security;
 alter table public.audit_log          enable row level security;
 
--- SELECT open on all
-drop policy if exists "stations select" on public.stations;
-create policy "stations select" on public.stations for select using (true);
-
-drop policy if exists "hardware select" on public.hardware;
-create policy "hardware select" on public.hardware for select using (true);
-
-drop policy if exists "sessions select" on public.sessions;
-create policy "sessions select" on public.sessions for select using (true);
-
-drop policy if exists "heartbeats select" on public.station_heartbeats;
-create policy "heartbeats select" on public.station_heartbeats for select using (true);
-
-drop policy if exists "config select" on public.admin_config;
-create policy "config select" on public.admin_config for select using (true);
-
-drop policy if exists "media select" on public.media_assets;
-create policy "media select" on public.media_assets for select using (true);
-
-drop policy if exists "playlists select" on public.playlists;
-create policy "playlists select" on public.playlists for select using (true);
-
-drop policy if exists "playlist items select" on public.playlist_items;
-create policy "playlist items select" on public.playlist_items for select using (true);
-
-drop policy if exists "device playlists select" on public.device_playlists;
-create policy "device playlists select" on public.device_playlists for select using (true);
-
-drop policy if exists "playback select" on public.playback_logs;
-create policy "playback select" on public.playback_logs for select using (true);
-
-drop policy if exists "tickets select" on public.tickets;
-create policy "tickets select" on public.tickets for select using (true);
-
-drop policy if exists "notifications select" on public.notifications;
-create policy "notifications select" on public.notifications for select using (true);
-
--- api_keys and audit_log: no client access at all (service-role only)
-drop policy if exists "api_keys no access" on public.api_keys;
-create policy "api_keys no access" on public.api_keys for all using (false) with check (false);
-
-drop policy if exists "audit no access" on public.audit_log;
-create policy "audit no access" on public.audit_log for all using (false) with check (false);
-
--- Block writes from publishable key
-drop policy if exists "stations write blocked" on public.stations;
-create policy "stations write blocked" on public.stations
-  for all using (false) with check (false);
-
-drop policy if exists "hardware write blocked" on public.hardware;
-create policy "hardware write blocked" on public.hardware
-  for all using (false) with check (false);
-
-drop policy if exists "sessions write blocked" on public.sessions;
-create policy "sessions write blocked" on public.sessions
-  for all using (false) with check (false);
-
-drop policy if exists "heartbeats write blocked" on public.station_heartbeats;
-create policy "heartbeats write blocked" on public.station_heartbeats
-  for all using (false) with check (false);
-
-drop policy if exists "config write blocked" on public.admin_config;
-create policy "config write blocked" on public.admin_config
-  for all using (false) with check (false);
-
-drop policy if exists "media write blocked" on public.media_assets;
-create policy "media write blocked" on public.media_assets
-  for all using (false) with check (false);
-
-drop policy if exists "playlists write blocked" on public.playlists;
-create policy "playlists write blocked" on public.playlists
-  for all using (false) with check (false);
-
+-- Drop every legacy policy from earlier schema versions (permissive SELECT
+-- policies on hardware/sessions/config/media/tickets/notifications, plus the
+-- old "write blocked" catch-alls). Names must match exactly.
+drop policy if exists "stations select"           on public.stations;
+drop policy if exists "stations write blocked"    on public.stations;
+drop policy if exists "hardware select"           on public.hardware;
+drop policy if exists "hardware write blocked"    on public.hardware;
+drop policy if exists "sessions select"           on public.sessions;
+drop policy if exists "sessions write blocked"    on public.sessions;
+drop policy if exists "heartbeats select"         on public.station_heartbeats;
+drop policy if exists "heartbeats write blocked"  on public.station_heartbeats;
+drop policy if exists "config select"             on public.admin_config;
+drop policy if exists "config write blocked"      on public.admin_config;
+drop policy if exists "media select"              on public.media_assets;
+drop policy if exists "media write blocked"       on public.media_assets;
+drop policy if exists "playlists select"          on public.playlists;
+drop policy if exists "playlists write blocked"   on public.playlists;
+drop policy if exists "playlist items select"     on public.playlist_items;
 drop policy if exists "playlist items write blocked" on public.playlist_items;
-create policy "playlist items write blocked" on public.playlist_items
-  for all using (false) with check (false);
-
+drop policy if exists "device playlists select"   on public.device_playlists;
 drop policy if exists "device playlists write blocked" on public.device_playlists;
-create policy "device playlists write blocked" on public.device_playlists
-  for all using (false) with check (false);
-
-drop policy if exists "playback write blocked" on public.playback_logs;
-create policy "playback write blocked" on public.playback_logs
-  for all using (false) with check (false);
-
-drop policy if exists "tickets write blocked" on public.tickets;
-create policy "tickets write blocked" on public.tickets
-  for all using (false) with check (false);
-
+drop policy if exists "playback select"           on public.playback_logs;
+drop policy if exists "playback write blocked"    on public.playback_logs;
+drop policy if exists "tickets select"            on public.tickets;
+drop policy if exists "tickets write blocked"     on public.tickets;
+drop policy if exists "notifications select"      on public.notifications;
 drop policy if exists "notifications write blocked" on public.notifications;
-create policy "notifications write blocked" on public.notifications
-  for all using (false) with check (false);
+drop policy if exists "api_keys no access"        on public.api_keys;
+drop policy if exists "audit no access"           on public.audit_log;
+drop policy if exists "admins select own"         on public.admins;
+
+-- The only public read in the system: the station directory.
+drop policy if exists "stations public read" on public.stations;
+create policy "stations public read" on public.stations
+  for select to anon, authenticated
+  using (true);
+
+-- Admins may read ONLY their own row (client-side role check at login).
+create policy "admins select own" on public.admins
+  for select to authenticated
+  using (auth.uid() = id);
 
 -- =========================================================================
 -- Seed: 15 demo stations
@@ -443,7 +395,7 @@ insert into public.hardware (id, station_id, device_id, device_type, broker_url,
 on conflict (id) do nothing;
 
 -- =========================================================================
--- Post-seed sync for existing deployments (idempotent — safe to re-run)
+-- Post-seed sync (idempotent — safe to re-run)
 -- =========================================================================
 
 -- Sync device_type from the owning station's device_model (core→one, plus→plus)
@@ -456,35 +408,3 @@ where h.station_id = s.id;
 insert into public.admin_config (key, value) values
   ('media_server', '{"baseUrl":"https://media.zunexglobal.com/ads","apiKey":""}'::jsonb)
 on conflict (key) do nothing;
-
--- =========================================================================
--- Row-Level Security hardening (idempotent — safe to re-run)
---
--- Model: all server-side access uses the service-role key (bypasses RLS).
--- The browser publishable key may ONLY:
---   - read public.stations            (public station directory)
---   - read its own row in public.admins (login role check — policy above)
--- Everything else is locked: no policies => no anon/authenticated access.
--- =========================================================================
-
--- stations: public read, no public writes
-alter table public.stations enable row level security;
-drop policy if exists "stations public read" on public.stations;
-create policy "stations public read" on public.stations
-  for select to anon, authenticated
-  using (true);
-
--- everything else: enable RLS with zero public policies (service-role only)
-alter table public.hardware           enable row level security;
-alter table public.sessions           enable row level security;
-alter table public.station_heartbeats enable row level security;
-alter table public.admin_config       enable row level security;
-alter table public.media_assets       enable row level security;
-alter table public.playlists          enable row level security;
-alter table public.playlist_items     enable row level security;
-alter table public.device_playlists   enable row level security;
-alter table public.playback_logs      enable row level security;
-alter table public.tickets            enable row level security;
-alter table public.api_keys           enable row level security;
-alter table public.notifications      enable row level security;
-alter table public.audit_log          enable row level security;
