@@ -70,10 +70,14 @@ create index if not exists idx_hw_devtype on public.hardware(device_type);
 create table if not exists public.sessions (
   id              text primary key,                     -- zs_...
   station_id      text not null references public.stations(id),
+  device_id       text,                                 -- hardware device used (hw_...)
   plan_id         text not null,
+  amount_paise    integer,                              -- charged amount (0 for ad-sponsored)
+  payment_intent_id text,                               -- PSP intent reference (pi_...)
   started_at      timestamptz default now(),
   ends_at         timestamptz,
   stopped_at      timestamptz,
+  paid_at         timestamptz,
   state           text default 'starting',              -- see SessionState union
   power_kw        double precision,
   delivered_kwh   double precision default 0,
@@ -81,7 +85,14 @@ create table if not exists public.sessions (
   created_at      timestamptz default now()
 );
 
+-- Columns added after initial release — idempotent ALTERs for existing DBs.
+alter table public.sessions add column if not exists device_id text;
+alter table public.sessions add column if not exists amount_paise integer;
+alter table public.sessions add column if not exists payment_intent_id text;
+alter table public.sessions add column if not exists paid_at timestamptz;
+
 create index if not exists idx_sessions_station on public.sessions(station_id);
+create index if not exists idx_sessions_device  on public.sessions(device_id);
 create index if not exists idx_sessions_state  on public.sessions(state);
 create index if not exists idx_sessions_ends   on public.sessions(ends_at);
 
