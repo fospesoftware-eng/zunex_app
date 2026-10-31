@@ -38,9 +38,16 @@ function refreshDeviceMap(): void {
 
 // ── Column feature detection ────────────────────────────────────────────────
 // If the live DB predates the extended columns (migration not applied yet),
-// PostgREST rejects the extended row — fall back to the legacy shape for the
-// rest of this process so sessions keep persisting either way.
-let extendedColumns: boolean | null = null;
+// PostgREST rejects the extended row — fall back to the legacy shape so
+// sessions keep persisting. The fallback self-heals: after a cooldown the
+// next write tries the extended row again, so applying the migration does
+// not require restarting the server.
+const EXTENDED_RECHECK_MS = 60_000;
+let extendedDisabledUntil = 0;
+
+function shouldUseExtended(): boolean {
+  return Date.now() >= extendedDisabledUntil;
+}
 
 function isMissingColumnError(msg: string | undefined): boolean {
   return Boolean(msg && (msg.includes("column") || msg.includes("schema cache")));
@@ -63,7 +70,7 @@ export function syncSessionToDb(s: SessionRecord): void {
   THROTTLED.add(key);
   setTimeout(() => THROTTLED.delete(key), 5000); // dedupe per state per session
 
-  if (extendedColumns !== false) refreshDeviceMap();
+  if (shouldUseExtended()) refreshDeviceMap();
 
   const now = Date.now();
   // Live energy estimate: watts × elapsed hours (final once completedAt lands).
@@ -94,19 +101,20 @@ export function syncSessionToDb(s: SessionRecord): void {
     paid_at: s.paidAt ? new Date(s.paidAt).toISOString() : null,
   };
 
-  const row = extendedColumns === false ? baseRow : extendedRow;
+  const useExtended = shouldUseExtended();
+  const row = useExtended ? extendedRow : baseRow;
 
   void supabase
     .from("sessions")
     .upsert(row, { onConflict: "id" })
     .then(({ error }) => {
       if (!error) {
-        if (extendedColumns === null) extendedColumns = true;
+        extendedDisabledUntil = 0; // extended path healthy
         return;
       }
       // Migration not applied yet → degrade to legacy columns and retry once.
-      if (extendedColumns !== false && isMissingColumnError(error.message)) {
-        extendedColumns = false;
+      if (useExtended && isMissingColumnError(error.message)) {
+        extendedDisabledUntil = Date.now() + EXTENDED_RECHECK_MS;
         void supabase
           .from("sessions")
           .upsert(baseRow, { onConflict: "id" })
